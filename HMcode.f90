@@ -4,7 +4,7 @@ MODULE cosdef
      !Contains only things that do not need to be recalculated with each new z
      REAL :: om_m, om_b, om_v, om_c, h, n, sig8, w, wa
      REAL :: A
-     REAL, ALLOCATABLE :: r_sigma(:), sigma1d(:)
+     REAL, ALLOCATABLE :: r_sigma(:), sigma(:)
      REAL, ALLOCATABLE :: growth(:), a_growth(:)
      REAL, ALLOCATABLE :: ktab(:), tktab(:), pktab(:)
   END TYPE cosmology
@@ -87,8 +87,8 @@ PROGRAM HMcode
   CALL initialise_cosmology(cosi)
 
   !Ignore this, only useful for bug tests
-  !DO
-  !CALL random_cosmology(cosi)
+  DO
+  CALL random_cosmology(cosi)
   
   CALL write_cosmology(cosi)
 
@@ -139,7 +139,7 @@ PROGRAM HMcode
   WRITE(*,*)
 
   !Ignore this, only useful for bug tests
-  !END DO
+  END DO
 
 CONTAINS
 
@@ -600,8 +600,8 @@ CONTAINS
     CALL allocate_lut(lut)
 
     !Mass range for halo model calculation
-    mmin=1.e0
-    mmax=1.e16
+    mmin=1.e2
+    mmax=1.e18
 
     dc=delta_c(z,cosm)
 
@@ -1096,7 +1096,7 @@ CONTAINS
     !These must be not allocated before sigma calculations otherwise when sigma(r) is called
     !otherwise sigma(R) looks for the result in the tables
     IF(ALLOCATED(cosm%r_sigma)) DEALLOCATE(cosm%r_sigma)
-    IF(ALLOCATED(cosm%sigma1d)) DEALLOCATE(cosm%sigma1d)   
+    IF(ALLOCATED(cosm%sigma)) DEALLOCATE(cosm%sigma)   
 
     !These values of 'r' work fine for any power spectrum of cosmological importance
     !Having nsig as a 2** number is most efficient for the look-up routines
@@ -1124,10 +1124,10 @@ CONTAINS
     END DO
 
     !Must be allocated after the sigtab calulation above
-    ALLOCATE(cosm%r_sigma(nsig),cosm%sigma1d(nsig))
+    ALLOCATE(cosm%r_sigma(nsig),cosm%sigma(nsig))
 
     cosm%r_sigma=rtab
-    cosm%sigma1d=sigtab
+    cosm%sigma=sigtab
 
     DEALLOCATE(rtab,sigtab)
 
@@ -1217,7 +1217,7 @@ CONTAINS
 
     !Finds sigma_cold from look-up tables
     
-    sigma_cb=grow(z,cosm)*exp(find(log(r),log(cosm%r_sigma),log(cosm%sigma1d),3,3))
+    sigma_cb=grow(z,cosm)*exp(find(log(r),log(cosm%r_sigma),log(cosm%sigma),3,3))
 
   END FUNCTION sigma_cb
 
