@@ -87,8 +87,8 @@ PROGRAM HMcode
   CALL initialise_cosmology(cosi)
 
   !Ignore this, only useful for bug tests
-  DO
-  CALL random_cosmology(cosi)
+  !DO
+  !CALL random_cosmology(cosi)
   
   CALL write_cosmology(cosi)
 
@@ -139,7 +139,7 @@ PROGRAM HMcode
   WRITE(*,*)
 
   !Ignore this, only useful for bug tests
-  END DO
+  !END DO
 
 CONTAINS
 
@@ -269,7 +269,6 @@ CONTAINS
        alpha=1.
     ELSE IF(imead==1) THEN
        !This uses the top-hat defined neff
-       !alpha=2.93*(1.77**lut%neff)
        alpha=3.24*1.85**lut%neff
     END IF
 
@@ -285,7 +284,6 @@ CONTAINS
     IMPLICIT NONE
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
-    !TYPE(parameters), INTENT(IN) :: p
     TYPE(tables), INTENT(IN) :: lut
 
     !This subroutine writes out the physical parameters at some redshift 
@@ -570,7 +568,6 @@ CONTAINS
     REAL, INTENT(IN) :: z
     INTEGER :: i, imin, imax, n
     REAL :: rin, dr, Dv, dc, f, m, mmin, mmax, nu, r, sig
-    !REAL, ALLOCATABLE :: rg_up(:), rg_dn(:), nu_up(:), nu_dn(:), mg_up(:), mg_dn(:)
     TYPE(cosmology) :: cosm
     TYPE(tables) :: lut
 
@@ -582,9 +579,6 @@ CONTAINS
     lut%sigv100=sigma_v(100.,z,cosm)
     lut%sig8z=sigma(8.,z,cosm)
 
-    !n=500
-    !ALLOCATE(rg_up(n),rg_dn(n),nu_up(n),nu_dn(n),mg_up(n),mg_dn(n))
-
     IF(ihm==1) WRITE(*,*) 'HALOMOD: Filling look-up tables'
     IF(ihm==1) WRITE(*,*) 'HALOMOD: Tables being filled at redshift:', z
       
@@ -595,7 +589,6 @@ CONTAINS
     IF(ALLOCATED(lut%rr)) CALL deallocate_LUT(lut)
 
     n=256
-
     lut%n=n
     CALL allocate_lut(lut)
 
@@ -805,7 +798,6 @@ CONTAINS
     REAL, PARAMETER :: pi=3.141592654
 
     !Relation between mean cosmological mass and radius
-
     mass_r=(4.*pi/3.)*cosmic_density(cosm)*(r**3.)
 
   END FUNCTION mass_r
@@ -833,60 +825,6 @@ CONTAINS
     Tk=Tk_eh(k,cosm)
 
   END FUNCTION Tk
-
-!!$  FUNCTION find_tk(k,cosm)
-!!$
-!!$    USE cosdef
-!!$    IMPLICIT NONE
-!!$    REAL :: find_tk
-!!$    REAL :: kmin, kmax
-!!$    REAL, INTENT(IN) :: k
-!!$    INTEGER :: n
-!!$    TYPE(cosmology) :: cosm
-!!$
-!!$    !Look-up and interpolation for T(k)
-!!$
-!!$    n=SIZE(cosm%ktab)
-!!$    kmin=cosm%ktab(1)
-!!$    kmax=cosm%ktab(n)
-!!$
-!!$    IF(k<kmin) THEN
-!!$       !For k<<keq Tk=1.
-!!$       find_tk=1.
-!!$    ELSE IF(k>kmax) THEN
-!!$       !Do some interpolation here based on knowledge of things at high k
-!!$       find_tk=cosm%tktab(n)*(log(k)/log(kmax))*((k/kmax)**(-2.))
-!!$    ELSE
-!!$       !Otherwise use the standard find algorithm
-!!$       find_tk=exp(find(log(k),log(cosm%ktab),log(cosm%tktab),3,3))
-!!$    END IF
-!!$
-!!$  END FUNCTION find_tk
-
-!!$  FUNCTION find_pk(k,cosm)
-!!$
-!!$    USE cosdef
-!!$    IMPLICIT NONE
-!!$    REAL :: find_pk
-!!$    REAL :: kmax
-!!$    REAL, INTENT(IN) :: k
-!!$    INTEGER :: n
-!!$    TYPE(cosmology) :: cosm
-!!$
-!!$    !Look-up and interpolation for P(k)
-!!$
-!!$    n=SIZE(cosm%ktab)
-!!$    kmax=cosm%ktab(n)
-!!$
-!!$    IF(k>kmax) THEN
-!!$       !Do some interpolation here based on knowledge of things at high k
-!!$       find_pk=cosm%pktab(n)*((log(k)/log(kmax))**2.)*((k/kmax)**(cosm%n-1.))
-!!$    ELSE
-!!$       !Otherwise use the standard find algorithm
-!!$       find_pk=exp(find(log(k),log(cosm%ktab),log(cosm%pktab),3,3))
-!!$    END IF
-!!$
-!!$  END FUNCTION find_pk
 
   FUNCTION Tk_eh(yy,cosm)
 
@@ -981,10 +919,6 @@ CONTAINS
        !Avoids some issues if p_lin is called for very (absurdly) high k values
        !For some reason crashes can occur if this is the case
        p_lin=0.
-!    ELSE IF(cosm%itk==5) THEN
-!       !itk==5 means P(k) has been taken as an input file
-!       !In this case use the input P(k) file
-!       p_lin=(cosm%A**2.)*(grow(z,cosm)**2.)*find_pk(k,cosm)
     ELSE
        !In this case look for the transfer function
        p_lin=(cosm%A**2.)*(grow(z,cosm)**2.)*(Tk(k,cosm)**2.)*(k**(cosm%n+3.))
@@ -1145,13 +1079,9 @@ CONTAINS
     TYPE(cosmology), INTENT(IN) :: cosm
 
     IF(r>=1.e-2) THEN
-
        sigma=sigint0(r,z,cosm)
-
     ELSE IF(r<1.e-2) THEN
-
        sigma=sqrt(sigint1(r,z,cosm)+sigint2(r,z,cosm))
-
     END IF
 
   END FUNCTION sigma
@@ -1216,6 +1146,7 @@ CONTAINS
     TYPE(cosmology), INTENT(IN) :: cosm
 
     !Finds sigma_cold from look-up tables
+    !In this version sigma_cold=sigma
     
     sigma_cb=grow(z,cosm)*exp(find(log(r),log(cosm%r_sigma),log(cosm%sigma),3,3))
 
@@ -1688,26 +1619,6 @@ CONTAINS
 
   END FUNCTION gst
 
-!!$  FUNCTION hubble2(z,cosm)
-!!$
-!!$    !This calculates the dimensionless squared hubble parameter at redshift z!
-!!$    !and it ignores contributions from radiation (not accurate at high z, but consistent with simulations)!
-!!$
-!!$    USE cosdef
-!!$    IMPLICIT NONE
-!!$    REAL :: hubble2
-!!$    REAL, INTENT(IN) :: z
-!!$    REAL :: om_m, om_v, w
-!!$    TYPE(cosmology), INTENT(IN) :: cosm
-!!$
-!!$    om_m=cosm%om_m
-!!$    om_v=cosm%om_v
-!!$    w=cosm%w
-!!$
-!!$    hubble2=(om_m*(1.+z)**3.)+om_v*((1.+z)**(3.*(1.+w)))+((1.-om_m-om_v)*(1.+z)**2.)
-!!$
-!!$  END FUNCTION hubble2
-
   FUNCTION hubble2(z,cosm)
 
     USE cosdef
@@ -1739,23 +1650,6 @@ CONTAINS
     omega_m=(om_m*(1.+z)**3.)/hubble2(z,cosm)
 
   END FUNCTION omega_m
-
-!!$  FUNCTION omega_v(z,cosm)
-!!$
-!!$    USE cosdef
-!!$    IMPLICIT NONE
-!!$    REAL :: omega_v
-!!$    REAL, INTENT(IN) :: z
-!!$    REAL :: om_v, w
-!!$    TYPE(cosmology), INTENT(IN) :: cosm
-!!$
-!!$    !This calculates Omega_v variations with z for any w
-!!$    om_v=cosm%om_v
-!!$    w=cosm%w
-!!$
-!!$    omega_v=om_v*((1.+z)**(3.*(1.+w)))/hubble2(z,cosm)
-!!$
-!!$  END FUNCTION omega_v
 
   FUNCTION omega_v(z,cosm)
     
@@ -2011,206 +1905,6 @@ CONTAINS
 
   END FUNCTION ci
 
-!!$  FUNCTION derivative_table(x,xin,yin,iorder,imeth)
-!!$
-!!$    IMPLICIT NONE
-!!$    REAL :: derivative_table
-!!$    REAL, INTENT(IN) :: x, xin(:), yin(:)
-!!$    REAL, ALLOCATABLE ::  xtab(:), ytab(:)
-!!$    REAL :: a, b, c, d
-!!$    REAL :: x1, x2, x3, x4
-!!$    REAL :: y1, y2, y3, y4
-!!$    INTEGER :: i, n
-!!$    INTEGER, INTENT(IN) :: imeth, iorder
-!!$    INTEGER :: maxorder, maxmethod
-!!$
-!!$    !Finds the derivative f'(x) given tables x, f(x)
-!!$
-!!$    !This version interpolates if the value is off either end of the array!
-!!$    !Care should be chosen to insert x, xtab, ytab as log if this might give better!
-!!$    !Results from the interpolation!
-!!$
-!!$    !imeth = 1 => find x in xtab by crudely searching
-!!$    !imeth = 2 => find x in xtab quickly assuming the table is linearly spaced
-!!$    !imeth = 3 => find x in xtab using midpoint splitting (iterations=CEILING(log2(n)))
-!!$
-!!$    !iorder = 1 => linear interpolation
-!!$    !iorder = 2 => quadratic interpolation
-!!$    !iorder = 3 => cubic interpolation
-!!$
-!!$    n=SIZE(xtab)
-!!$
-!!$    maxorder=3
-!!$    maxmethod=3
-!!$
-!!$    n=SIZE(xin)
-!!$    IF(n .NE. SIZE(yin)) STOP 'FIND: Tables not of the same size'
-!!$    ALLOCATE(xtab(n),ytab(n))
-!!$
-!!$    xtab=xin
-!!$    ytab=yin
-!!$
-!!$    IF(xtab(1)>xtab(n)) THEN
-!!$       !Reverse the arrays in this case
-!!$       CALL reverse(xtab)
-!!$       CALL reverse(ytab)
-!!$    END IF
-!!$
-!!$    IF(iorder<1) STOP 'FIND: find order not specified correctly'
-!!$    IF(iorder>maxorder) STOP 'FIND: find order not specified correctly'
-!!$    IF(imeth<1) STOP 'FIND: Method of finding within a table not specified correctly'
-!!$    IF(imeth>maxmethod) STOP 'FIND: Method of finding within a table not specified correctly'
-!!$
-!!$    IF(iorder==1) THEN
-!!$
-!!$       IF(n<2) STOP 'FIND: Not enough points in your table for linear interpolation'
-!!$
-!!$       IF(x<=xtab(2)) THEN
-!!$
-!!$          x2=xtab(2)
-!!$          x1=xtab(1)
-!!$
-!!$          y2=ytab(2)
-!!$          y1=ytab(1)
-!!$
-!!$       ELSE IF (x>=xtab(n-1)) THEN
-!!$
-!!$          x2=xtab(n)
-!!$          x1=xtab(n-1)
-!!$
-!!$          y2=ytab(n)
-!!$          y1=ytab(n-1)
-!!$
-!!$       ELSE
-!!$
-!!$          IF(imeth==1) i=search_int(x,xtab)
-!!$          IF(imeth==2) i=linear_table_integer(x,xtab)
-!!$          IF(imeth==3) i=int_split(x,xtab)
-!!$
-!!$          x2=xtab(i+1)
-!!$          x1=xtab(i)
-!!$
-!!$          y2=ytab(i+1)
-!!$          y1=ytab(i)
-!!$
-!!$       END IF
-!!$
-!!$       CALL fit_line(a,b,x1,y1,x2,y2)
-!!$       derivative_table=a
-!!$
-!!$    ELSE IF(iorder==2) THEN
-!!$
-!!$       IF(n<3) STOP 'FIND_QUADRATIC: Not enough points in your table'
-!!$
-!!$       IF(x<=xtab(2) .OR. x>=xtab(n-1)) THEN
-!!$
-!!$          IF(x<=xtab(2)) THEN
-!!$
-!!$             x3=xtab(3)
-!!$             x2=xtab(2)
-!!$             x1=xtab(1)
-!!$
-!!$             y3=ytab(3)
-!!$             y2=ytab(2)
-!!$             y1=ytab(1)
-!!$
-!!$          ELSE IF (x>=xtab(n-1)) THEN
-!!$
-!!$             x3=xtab(n)
-!!$             x2=xtab(n-1)
-!!$             x1=xtab(n-2)
-!!$
-!!$             y3=ytab(n)
-!!$             y2=ytab(n-1)
-!!$             y1=ytab(n-2)
-!!$
-!!$          END IF
-!!$
-!!$          CALL fit_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
-!!$
-!!$          derivative_table=2.*a*x+b
-!!$
-!!$       ELSE
-!!$
-!!$          IF(imeth==1) i=search_int(x,xtab)
-!!$          IF(imeth==2) i=linear_table_integer(x,xtab)
-!!$          IF(imeth==3) i=int_split(x,xtab)
-!!$
-!!$          x1=xtab(i-1)
-!!$          x2=xtab(i)
-!!$          x3=xtab(i+1)
-!!$          x4=xtab(i+2)
-!!$
-!!$          y1=ytab(i-1)
-!!$          y2=ytab(i)
-!!$          y3=ytab(i+1)
-!!$          y4=ytab(i+2)
-!!$
-!!$          !In this case take the average of two separate quadratic spline values
-!!$
-!!$          derivative_table=0.
-!!$
-!!$          CALL fit_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
-!!$          derivative_table=derivative_table+(2.*a*x+b)/2.
-!!$
-!!$          CALL fit_quadratic(a,b,c,x2,y2,x3,y3,x4,y4)
-!!$          derivative_table=derivative_table+(2.*a*x+b)/2.
-!!$
-!!$       END IF
-!!$
-!!$    ELSE IF(iorder==3) THEN
-!!$
-!!$       IF(n<4) STOP 'FIND_CUBIC: Not enough points in your table'
-!!$
-!!$       IF(x<=xtab(3)) THEN
-!!$
-!!$          x4=xtab(4)
-!!$          x3=xtab(3)
-!!$          x2=xtab(2)
-!!$          x1=xtab(1)
-!!$
-!!$          y4=ytab(4)
-!!$          y3=ytab(3)
-!!$          y2=ytab(2)
-!!$          y1=ytab(1)
-!!$
-!!$       ELSE IF (x>=xtab(n-2)) THEN
-!!$
-!!$          x4=xtab(n)
-!!$          x3=xtab(n-1)
-!!$          x2=xtab(n-2)
-!!$          x1=xtab(n-3)
-!!$
-!!$          y4=ytab(n)
-!!$          y3=ytab(n-1)
-!!$          y2=ytab(n-2)
-!!$          y1=ytab(n-3)
-!!$
-!!$       ELSE
-!!$
-!!$          IF(imeth==1) i=search_int(x,xtab)
-!!$          IF(imeth==2) i=linear_table_integer(x,xtab)
-!!$          IF(imeth==3) i=int_split(x,xtab)
-!!$
-!!$          x1=xtab(i-1)
-!!$          x2=xtab(i)
-!!$          x3=xtab(i+1)
-!!$          x4=xtab(i+2)
-!!$
-!!$          y1=ytab(i-1)
-!!$          y2=ytab(i)
-!!$          y3=ytab(i+1)
-!!$          y4=ytab(i+2)
-!!$
-!!$       END IF
-!!$
-!!$       CALL fit_cubic(a,b,c,d,x1,y1,x2,y2,x3,y3,x4,y4)
-!!$       derivative_table=3.*a*(x**2.)+2.*b*x+c
-!!$
-!!$    END IF
-!!$
-!!$  END FUNCTION derivative_table
-
    FUNCTION derivative_table(x,xin,yin,iorder,imeth)
 
     IMPLICIT NONE
@@ -2289,9 +1983,6 @@ CONTAINS
        ELSE
 
           i=table_integer(x,xtab,imeth)
-          !IF(imeth==1) i=search_int(x,xtab)
-          !IF(imeth==2) i=linear_table_integer(x,xtab)
-          !IF(imeth==3) i=int_split(x,xtab)
 
           x2=xtab(i+1)
           x1=xtab(i)
@@ -2339,9 +2030,6 @@ CONTAINS
        ELSE
 
           i=table_integer(x,xtab,imeth)
-          !IF(imeth==1) i=search_int(x,xtab)
-          !IF(imeth==2) i=linear_table_integer(x,xtab)
-          !IF(imeth==3) i=int_split(x,xtab)
 
           x1=xtab(i-1)
           x2=xtab(i)
@@ -2396,10 +2084,7 @@ CONTAINS
        ELSE
 
           i=table_integer(x,xtab,imeth)
-          !IF(imeth==1) i=search_int(x,xtab)
-          !IF(imeth==2) i=linear_table_integer(x,xtab)
-          !IF(imeth==3) i=int_split(x,xtab)
-
+          
           x1=xtab(i-1)
           x2=xtab(i)
           x3=xtab(i+1)
@@ -2418,229 +2103,6 @@ CONTAINS
     END IF
 
   END FUNCTION derivative_table
-  
-!!$  FUNCTION find(x,xin,yin,iorder,imeth)
-!!$
-!!$    IMPLICIT NONE
-!!$    REAL :: find
-!!$    REAL, INTENT(IN) :: x, xin(:), yin(:)
-!!$    REAL, ALLOCATABLE ::  xtab(:), ytab(:)
-!!$    REAL :: a, b, c, d
-!!$    REAL :: x1, x2, x3, x4
-!!$    REAL :: y1, y2, y3, y4
-!!$    INTEGER :: i, n
-!!$    INTEGER, INTENT(IN) :: imeth, iorder
-!!$    INTEGER :: maxorder, maxmethod
-!!$
-!!$    !Interpolation routine.
-!!$
-!!$    !This version interpolates if the value is off either end of the array!
-!!$    !Care should be chosen to insert x, xtab, ytab as log if this might give better!
-!!$    !Results from the interpolation!
-!!$
-!!$    !If the value required is off the table edge the interpolation is always linear
-!!$
-!!$    !imeth = 1 => find x in xtab by crudely searching from x(1) to x(n)
-!!$    !imeth = 2 => find x in xtab quickly assuming the table is linearly spaced
-!!$    !imeth = 3 => find x in xtab using midpoint splitting (iterations=CEILING(log2(n)))
-!!$
-!!$    !iorder = 1 => linear interpolation
-!!$    !iorder = 2 => quadratic interpolation
-!!$    !iorder = 3 => cubic interpolation
-!!$
-!!$    maxorder=3
-!!$    maxmethod=3
-!!$
-!!$    n=SIZE(xin)
-!!$    IF(n .NE. SIZE(yin)) STOP 'FIND: Tables not of the same size'
-!!$    ALLOCATE(xtab(n),ytab(n))
-!!$
-!!$    xtab=xin
-!!$    ytab=yin
-!!$
-!!$    IF(xtab(1)>xtab(n)) THEN
-!!$       !Reverse the arrays in this case
-!!$       CALL reverse(xtab)
-!!$       CALL reverse(ytab)
-!!$    END IF
-!!$
-!!$    IF(iorder<1) STOP 'FIND: find order not specified correctly'
-!!$    IF(iorder>maxorder) STOP 'FIND: find order not specified correctly'
-!!$    IF(imeth<1) STOP 'FIND: Method of finding within a table not specified correctly'
-!!$    IF(imeth>maxmethod) STOP 'FIND: Method of finding within a table not specified correctly'
-!!$
-!!$    IF(x<xtab(1)) THEN
-!!$
-!!$       x1=xtab(1)
-!!$       x2=xtab(2)
-!!$
-!!$       y1=ytab(1)
-!!$       y2=ytab(2)
-!!$
-!!$       CALL fit_line(a,b,x1,y1,x2,y2)
-!!$       find=a*x+b
-!!$
-!!$    ELSE IF(x>xtab(n)) THEN
-!!$
-!!$       x1=xtab(n-1)
-!!$       x2=xtab(n)
-!!$
-!!$       y1=ytab(n-1)
-!!$       y2=ytab(n)
-!!$
-!!$       CALL fit_line(a,b,x1,y1,x2,y2)
-!!$       find=a*x+b
-!!$
-!!$    ELSE IF(iorder==1) THEN
-!!$
-!!$       IF(n<2) STOP 'FIND: Not enough points in your table for linear interpolation'
-!!$
-!!$       IF(x<=xtab(2)) THEN
-!!$
-!!$          x1=xtab(1)
-!!$          x2=xtab(2)
-!!$
-!!$          y1=ytab(1)
-!!$          y2=ytab(2)
-!!$
-!!$       ELSE IF (x>=xtab(n-1)) THEN
-!!$
-!!$          x1=xtab(n-1)
-!!$          x2=xtab(n)
-!!$
-!!$          y1=ytab(n-1)
-!!$          y2=ytab(n)
-!!$
-!!$       ELSE
-!!$
-!!$          IF(imeth==1) i=search_int(x,xtab)
-!!$          IF(imeth==2) i=linear_table_integer(x,xtab)
-!!$          IF(imeth==3) i=int_split(x,xtab)
-!!$
-!!$          x1=xtab(i)
-!!$          x2=xtab(i+1)
-!!$
-!!$          y1=ytab(i)
-!!$          y2=ytab(i+1)
-!!$
-!!$       END IF
-!!$
-!!$       CALL fit_line(a,b,x1,y1,x2,y2)
-!!$       find=a*x+b
-!!$
-!!$    ELSE IF(iorder==2) THEN
-!!$
-!!$       IF(n<3) STOP 'FIND: Not enough points in your table'
-!!$
-!!$       IF(x<=xtab(2) .OR. x>=xtab(n-1)) THEN
-!!$
-!!$          IF(x<=xtab(2)) THEN
-!!$
-!!$             x1=xtab(1)
-!!$             x2=xtab(2)
-!!$             x3=xtab(3)
-!!$
-!!$             y1=ytab(1)
-!!$             y2=ytab(2)
-!!$             y3=ytab(3)
-!!$
-!!$          ELSE IF (x>=xtab(n-1)) THEN
-!!$
-!!$             x1=xtab(n-2)
-!!$             x2=xtab(n-1)
-!!$             x3=xtab(n)
-!!$
-!!$             y1=ytab(n-2)
-!!$             y2=ytab(n-1)
-!!$             y3=ytab(n)
-!!$
-!!$          END IF
-!!$
-!!$          CALL fit_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
-!!$
-!!$          find=a*(x**2.)+b*x+c
-!!$
-!!$       ELSE
-!!$
-!!$          i=table_integer(x,xtab,imeth)
-!!$          !IF(imeth==1) i=search_int(x,xtab)
-!!$          !IF(imeth==2) i=linear_table_integer(x,xtab)
-!!$          !IF(imeth==3) i=int_split(x,xtab)
-!!$
-!!$          x1=xtab(i-1)
-!!$          x2=xtab(i)
-!!$          x3=xtab(i+1)
-!!$          x4=xtab(i+2)
-!!$
-!!$          y1=ytab(i-1)
-!!$          y2=ytab(i)
-!!$          y3=ytab(i+1)
-!!$          y4=ytab(i+2)
-!!$
-!!$          !In this case take the average of two separate quadratic spline values
-!!$
-!!$          find=0.
-!!$
-!!$          CALL fit_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
-!!$          find=find+(a*(x**2.)+b*x+c)/2.
-!!$
-!!$          CALL fit_quadratic(a,b,c,x2,y2,x3,y3,x4,y4)
-!!$          find=find+(a*(x**2.)+b*x+c)/2.
-!!$
-!!$       END IF
-!!$
-!!$    ELSE IF(iorder==3) THEN
-!!$
-!!$       IF(n<4) STOP 'FIND: Not enough points in your table'
-!!$
-!!$       IF(x<=xtab(3)) THEN
-!!$
-!!$          x1=xtab(1)
-!!$          x2=xtab(2)
-!!$          x3=xtab(3)
-!!$          x4=xtab(4)        
-!!$
-!!$          y1=ytab(1)
-!!$          y2=ytab(2)
-!!$          y3=ytab(3)
-!!$          y4=ytab(4)
-!!$
-!!$       ELSE IF (x>=xtab(n-2)) THEN
-!!$
-!!$          x1=xtab(n-3)
-!!$          x2=xtab(n-2)
-!!$          x3=xtab(n-1)
-!!$          x4=xtab(n)
-!!$
-!!$          y1=ytab(n-3)
-!!$          y2=ytab(n-2)
-!!$          y3=ytab(n-1)
-!!$          y4=ytab(n)
-!!$
-!!$       ELSE
-!!$
-!!$          IF(imeth==1) i=search_int(x,xtab)
-!!$          IF(imeth==2) i=linear_table_integer(x,xtab)
-!!$          IF(imeth==3) i=int_split(x,xtab)
-!!$
-!!$          x1=xtab(i-1)
-!!$          x2=xtab(i)
-!!$          x3=xtab(i+1)
-!!$          x4=xtab(i+2)
-!!$
-!!$          y1=ytab(i-1)
-!!$          y2=ytab(i)
-!!$          y3=ytab(i+1)
-!!$          y4=ytab(i+2)
-!!$
-!!$       END IF
-!!$
-!!$       CALL fit_cubic(a,b,c,d,x1,y1,x2,y2,x3,y3,x4,y4)
-!!$       find=a*x**3.+b*x**2.+c*x+d
-!!$
-!!$    END IF
-!!$
-!!$  END FUNCTION find
 
   FUNCTION find(x,xin,yin,iorder,imeth)
 
@@ -3119,7 +2581,6 @@ CONTAINS
     REAL*8, ALLOCATABLE :: x8(:), t8(:), v8(:), xh(:), th(:), vh(:)
     REAL, ALLOCATABLE :: x(:), v(:), t(:)
     INTEGER :: i, j, k, n, np, ifail, kn, imeth
-!    REAL, EXTERNAL :: fx, fv
     TYPE(cosmology) :: cosm
 
     !Solves 2nd order ODE x''(t) from ti to tf and writes out array of x, v, t values
