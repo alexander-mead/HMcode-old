@@ -19,6 +19,7 @@ MODULE cosdef
 END MODULE cosdef
 
 PROGRAM HMcode
+  
   USE cosdef
   IMPLICIT NONE
   REAL :: z
@@ -34,7 +35,7 @@ PROGRAM HMcode
   CHARACTER(len=64) :: input, output
 
   !HMcode developed by Alexander Mead
-  !If you use this in your work please cite the original paper: http://arxiv.org/abs/1505.07833
+  !If you use this in your work please cite the original paper: http://arxiv.org/abs/1505.07833 and maybe the update: http://arxiv.org/abs/1602.02154
   !and consider citing the source code at ASCL: http://ascl.net/1508.001
 
   !ihm
@@ -44,7 +45,7 @@ PROGRAM HMcode
 
   !imead
   !0 - Do the standard halo model calculation (Dv=200, dc=1.686, Sheth & Tormen (199) mass function, Bullock (2001) c(M)'
-  !1 - Do the accurate calculation detailed in 1505.07833 with updates in Mead et al. (2016)
+  !1 - Do the accurate calculation detailed in Mead et al. (2015; 1505.07833) with updates from Mead et al. (2016; 1602.02154)
   imead=1
 
   WRITE(*,*)
@@ -248,11 +249,10 @@ CONTAINS
     ELSE IF(imead==1) THEN
        !fdamp=0.188*sigma_cb(8.,z,cosm)**4.29
        fdamp=0.0095*lut%sigv100**1.37
+       !Catches extreme values of fdamp that occur for ridiculous cosmologies
+       IF(fdamp<1.e-3) fdamp=0.
+       IF(fdamp>0.99)  fdamp=0.99
     END IF
-
-    !Catches extreme values of fdamp
-    IF(fdamp<1.e-3) fdamp=1.e-3
-    IF(fdamp>0.99)  fdamp=0.99
 
   END FUNCTION fdamp
 
@@ -651,10 +651,8 @@ CONTAINS
     IF(ihm==1) WRITE(*,*) 'HALOMOD: c min [Msun/h]:', lut%c(lut%n)
     IF(ihm==1) WRITE(*,*) 'HALOMOD: c max [Msun/h]:', lut%c(1)
     IF(ihm==1) WRITE(*,*) 'HALOMOD: Done'
-
     IF(ihm==1) WRITE(*,*)
-
-    if(ihm==1) CALL write_parameters(z,lut,cosi)
+    IF(ihm==1) CALL write_parameters(z,lut,cosm)
 
     ihm=0
 
@@ -860,7 +858,7 @@ CONTAINS
     b2=0.238*(om_m*h*h)**0.223
     zd=1291.*(1+b1*(om_b*h*h)**b2)*(om_m*h*h)**0.251/(1.+0.659*(om_m*h*h)**0.828)
     ze=2.50e4*om_m*h*h/thet**4.
-    rd=31500.*om_b*h*h/thet**4./zd
+    rd=31500.*om_b*h*h/thet**4./zd !Should this be 1+zd (Steven Murray enquirey)?
     re=31500.*om_b*h*h/thet**4./ze
     rke=7.46e-2*om_m*h*h/thet**2.
     s=(2./3./rke)*sqrt(6./re)*log((sqrt(1.+rd)+sqrt(rd+re))/(1+sqrt(re)))
@@ -1025,7 +1023,6 @@ CONTAINS
     !and prevents a large number of calls to the sigint functions
     !rmin and rmax need to be decided in advance and are chosen such that
     !R vs. sigma(R) is approximately power-law below and above these values of R   
-    !This wouldn't be appropriate for models with a linear spectrum cut-off (e.g. WDM)
 
     !These must be not allocated before sigma calculations otherwise when sigma(r) is called
     !otherwise sigma(R) looks for the result in the tables
@@ -1051,7 +1048,7 @@ CONTAINS
        r=exp(log(rmin)+log(rmax/rmin)*float(i-1)/float(nsig-1))
 
        sig=sigma(r,0.,cosm)
-
+       
        rtab(i)=r
        sigtab(i)=sig
 
