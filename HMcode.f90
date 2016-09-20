@@ -6,7 +6,8 @@ MODULE cosdef
      REAL :: A
      REAL, ALLOCATABLE :: r_sigma(:), sigma(:)
      REAL, ALLOCATABLE :: growth(:), a_growth(:)
-     REAL, ALLOCATABLE :: ktab(:), tktab(:), pktab(:)
+     !REAL, ALLOCATABLE :: ktab(:), tktab(:), pktab(:)
+     INTEGER :: nsig, ng
   END TYPE cosmology
 
   TYPE tables
@@ -19,7 +20,7 @@ MODULE cosdef
 END MODULE cosdef
 
 PROGRAM HMcode
-  
+
   USE cosdef
   IMPLICIT NONE
   REAL :: z
@@ -31,8 +32,9 @@ PROGRAM HMcode
   REAL, PARAMETER :: pi=3.141592654
   TYPE(cosmology) :: cosi
   TYPE(tables) :: lut
-  LOGICAL :: lexist
-  CHARACTER(len=64) :: input, output
+  CHARACTER(len=64) :: output
+
+  !19.09.16 - changed subroutines so that none assume an array size
 
   !HMcode developed by Alexander Mead
   !If you use this in your work please cite the original paper: http://arxiv.org/abs/1505.07833 and maybe the update: http://arxiv.org/abs/1602.02154
@@ -60,7 +62,8 @@ PROGRAM HMcode
   nk=200
   kmin=0.001
   kmax=1.e4
-  CALL fill_table(kmin,kmax,k,nk,1)
+  CALL fill_table(log(kmin),log(kmax),k,nk)
+  k=exp(k)
 
   WRITE(*,*) 'k min:', kmin
   WRITE(*,*) 'k max:', kmax
@@ -71,13 +74,13 @@ PROGRAM HMcode
   nz=16
   zmin=0.
   zmax=4.
-  CALL fill_table(zmin,zmax,ztab,nz,0)
+  CALL fill_table(zmin,zmax,ztab,nz)
 
   WRITE(*,*) 'z min:', zmin
   WRITE(*,*) 'z max:', zmax
   WRITE(*,*) 'number of z:', nz
   WRITE(*,*)
-  
+
   !Fill table for output power
   ALLOCATE(ptab(nz,nk))
 
@@ -88,9 +91,10 @@ PROGRAM HMcode
   CALL initialise_cosmology(cosi)
 
   !Ignore this, only useful for bug tests
+  !CALL RNG_set(0)
   !DO
   !CALL random_cosmology(cosi)
-  
+
   CALL write_cosmology(cosi)
 
   !Loop over redshifts
@@ -156,9 +160,11 @@ CONTAINS
     IF(imead==0) THEN
        Delta_v=200.
     ELSE IF(imead==1) THEN
-       Delta_v=418.*(omega_m(z,cosm)**(-0.352))       
+       Delta_v=418.*(omega_m(z,cosm)**(-0.352))
+    ELSE
+       STOP 'Error, imead defined incorrectly'
     END IF
-    
+
   END FUNCTION Delta_v
 
   FUNCTION delta_c(z,cosm)
@@ -174,6 +180,8 @@ CONTAINS
        delta_c=1.686
     ELSE IF(imead==1) THEN
        delta_c=1.59+0.0314*log(sigma_cb(8.,z,cosm))
+    ELSE
+       STOP 'Error, imead defined incorrectly'
     END IF
 
     !Nakamura & Suto (1997) fitting formula for LCDM
@@ -194,10 +202,12 @@ CONTAINS
     ELSE IF(imead==1) THEN
        !The first parameter here is 'eta_0' in Mead et al. (2015; arXiv 1505.07833)
        eta=0.603-0.3*(sigma_cb(8.,z,cosm))
+    ELSE
+       STOP 'Error, imead defined incorrectly'
     END IF
 
   END FUNCTION eta
- 
+
   FUNCTION kstar(lut,cosm)
 
     USE cosdef
@@ -212,6 +222,8 @@ CONTAINS
     ELSE IF(imead==1) THEN
        !One-halo cut-off wavenumber
        kstar=0.584*(lut%sigv)**(-1.)
+    ELSE
+       STOP 'Error, imead defined incorrectly'
     END IF
 
   END FUNCTION kstar
@@ -228,8 +240,10 @@ CONTAINS
        !Set to 4 for the standard Bullock value
        As=4.
     ELSE IF(imead==1) THEN
-    !This is the 'A' halo-concentration parameter in Mead et al. (2015; arXiv 1505.07833)
+       !This is the 'A' halo-concentration parameter in Mead et al. (2015; arXiv 1505.07833)
        As=3.13
+    ELSE
+       STOP 'Error, imead defined incorrectly'
     END IF
 
   END FUNCTION As
@@ -252,6 +266,8 @@ CONTAINS
        !Catches extreme values of fdamp that occur for ridiculous cosmologies
        IF(fdamp<1.e-3) fdamp=0.
        IF(fdamp>0.99)  fdamp=0.99
+    ELSE
+       STOP 'Error, imead defined incorrectly'
     END IF
 
   END FUNCTION fdamp
@@ -270,6 +286,8 @@ CONTAINS
     ELSE IF(imead==1) THEN
        !This uses the top-hat defined neff
        alpha=3.24*1.85**lut%neff
+    ELSE
+       STOP 'Error, imead defined incorrectly'
     END IF
 
     !Catches values of alpha that are crazy
@@ -315,7 +333,7 @@ CONTAINS
        !This catches some very strange values
        r_nl=lut%rr(1)
     ELSE
-       r_nl=exp(find(log(1.),log(lut%nu),log(lut%rr),3,3))
+       r_nl=exp(find(log(1.),log(lut%nu),log(lut%rr),lut%n,3,3))
     END IF
 
   END FUNCTION r_nl
@@ -345,42 +363,28 @@ CONTAINS
 
   END SUBROUTINE halomod
 
-  SUBROUTINE fill_table(min,max,arr,n,ilog)
+  SUBROUTINE fill_table(min,max,arr,n)
 
+    !Fills array 'arr' in equally spaced intervals
+    !I'm not sure if inputting an array like this is okay
     IMPLICIT NONE
     INTEGER :: i
     REAL, INTENT(IN) :: min, max
-    REAL :: a, b
     REAL, ALLOCATABLE :: arr(:)
-    INTEGER, INTENT(IN) :: ilog, n
+    INTEGER, INTENT(IN) :: n
 
-    !Fills array 'arr' in equally spaced intervals
-    !ilog=0 does linear spacing
-    !ilog=1 does log spacing
-
+    !Allocate the array, and deallocate it if it is full
     IF(ALLOCATED(arr)) DEALLOCATE(arr)
-
     ALLOCATE(arr(n))
-
     arr=0.
 
-    IF(ilog==0) THEN
-       a=min
-       b=max
-    ELSE IF(ilog==1) THEN
-       a=log(min)
-       b=log(max)
-    END IF
-
     IF(n==1) THEN
-       arr(1)=a
+       arr(1)=min
     ELSE IF(n>1) THEN
        DO i=1,n
-          arr(i)=a+(b-a)*float(i-1)/float(n-1)
+          arr(i)=min+(max-min)*float(i-1)/float(n-1)
        END DO
     END IF
-
-    IF(ilog==1) arr=exp(arr)
 
   END SUBROUTINE fill_table
 
@@ -407,9 +411,7 @@ CONTAINS
 
     USE cosdef
     IMPLICIT NONE
-    CHARACTER(len=64) :: input
     TYPE(cosmology) :: cosm
-    LOGICAL :: lexist
 
     cosm%om_m=0.3
     cosm%om_v=1.-cosm%om_m
@@ -467,66 +469,73 @@ CONTAINS
 
     om_m_min=0.1
     om_m_max=1.
-    cosm%om_m=ran(om_m_min,om_m_max)
+    cosm%om_m=uniform(om_m_min,om_m_max)
 
     cosm%om_v=1.-cosm%om_m
 
     om_b_min=0.005
     om_b_max=MIN(0.095,cosm%om_m)
-    cosm%om_b=ran(om_b_min,om_b_max)
+    cosm%om_b=uniform(om_b_min,om_b_max)
 
     cosm%om_c=cosm%om_m-cosm%om_b
 
     n_min=0.5
     n_max=1.5
-    cosm%n=ran(n_min,n_max)
+    cosm%n=uniform(n_min,n_max)
 
     h_min=0.4
     h_max=1.2
-    cosm%h=ran(h_min,h_max)
+    cosm%h=uniform(h_min,h_max)
 
     w_min=-1.5
     w_max=-0.5
-    cosm%w=ran(w_min,w_max)
+    cosm%w=uniform(w_min,w_max)
 
     wa_min=-1.
     wa_max=-cosm%w*0.8
-    cosm%wa=ran(wa_min,wa_max)
+    cosm%wa=uniform(wa_min,wa_max)
 
     sig8_min=0.2
     sig8_max=1.5
-    cosm%sig8=ran(sig8_min,sig8_max)
+    cosm%sig8=uniform(sig8_min,sig8_max)
 
   END SUBROUTINE random_cosmology
 
-  SUBROUTINE RNG_set
+  SUBROUTINE RNG_set(seed)
 
+    !Seeds the RNG using the system clock so that it is different each time
     IMPLICIT NONE
     INTEGER :: int, timearray(3)
     REAL :: rand
+    INTEGER, INTENT(IN) :: seed
 
     WRITE(*,*) 'Initialising RNG'
-    !This fills the time array using the system clock!
-    !If called within the same second the numbers will be identical!
-    CALL itime(timeArray)
-    !This then initialises the generator!
-    int=rand(timeArray(1)+timeArray(2)+timeArray(3))
+
+    IF(seed==0) THEN
+       !This fills the time array using the system clock!
+       !If called within the same second the numbers will be identical!
+       CALL itime(timeArray)
+       !This then initialises the generator!
+       int=FLOOR(rand(timeArray(1)+timeArray(2)+timeArray(3)))
+    ELSE
+       int=FLOOR(rand(seed))
+    END IF
     WRITE(*,*) 'RNG set'
     WRITE(*,*)
 
   END SUBROUTINE RNG_set
 
-  FUNCTION ran(x1,x2)
+  FUNCTION uniform(x1,x2)
 
+    !Produces a uniform random number between x1 and x2
     IMPLICIT NONE
-    REAL :: rand, ran
-    REAL :: x1,x2
+    REAL :: uniform
+    REAL, INTENT(IN) :: x1,x2
 
-    !Generates a random number in the interval x1->x2 with uniform probability
-    !rand is some inbuilt function!
-    ran=x1+(x2-x1)*(rand(0))
+    !Rand is some inbuilt function
+    uniform=x1+(x2-x1)*(rand(0))
 
-  END FUNCTION ran
+  END FUNCTION uniform
 
   SUBROUTINE allocate_LUT(lut)
 
@@ -566,8 +575,8 @@ CONTAINS
     USE cosdef
     IMPLICIT NONE
     REAL, INTENT(IN) :: z
-    INTEGER :: i, imin, imax, n
-    REAL :: rin, dr, Dv, dc, f, m, mmin, mmax, nu, r, sig
+    INTEGER :: i, n
+    REAL :: Dv, dc, f, m, mmin, mmax, nu, r, sig
     TYPE(cosmology) :: cosm
     TYPE(tables) :: lut
 
@@ -581,7 +590,7 @@ CONTAINS
 
     IF(ihm==1) WRITE(*,*) 'HALOMOD: Filling look-up tables'
     IF(ihm==1) WRITE(*,*) 'HALOMOD: Tables being filled at redshift:', z
-      
+
     IF(ihm==1) WRITE(*,*) 'HALOMOD: sigv [Mpc/h]:', lut%sigv
     IF(ihm==1) WRITE(*,*) 'HALOMOD: sigv100 [Mpc/h]:', lut%sigv100
     IF(ihm==1) WRITE(*,*) 'HALOMOD: sig8(z):', lut%sig8z
@@ -665,7 +674,7 @@ CONTAINS
     REAL :: radius_m
     REAL, INTENT(IN) :: m
     TYPE(cosmology), INTENT(IN) :: cosm
-    REAL, PARAMETER :: pi=3.141592654
+    !REAL, PARAMETER :: pi=3.141592654
 
     radius_m=(3.*m/(4.*pi*cosmic_density(cosm)))**(1./3.)
 
@@ -680,7 +689,7 @@ CONTAINS
     TYPE(tables) :: lut
 
     !Numerical differentiation to find effective index at collapse
-    neff=-3.-derivative_table(log(lut%rnl),log(lut%rr),log(lut%sig**2.),3,3)
+    neff=-3.-derivative_table(log(lut%rnl),log(lut%rr),log(lut%sig**2.),lut%n,3,3)
 
     !For some bizarre cosmologies r_nl is very small, so almost no collapse has occured
     !In this case the n_eff calculation goes mad and needs to be fixed using this fudge.
@@ -696,7 +705,7 @@ CONTAINS
     REAL, INTENT(IN) :: z
     TYPE(cosmology) :: cosm, cos_lcdm
     TYPE(tables) :: lut
-    REAL :: A, zinf, ainf, zf, g_lcdm, g_wcdm, w
+    REAL :: A, zinf, ainf, zf, g_lcdm, g_wcdm
     INTEGER :: i
 
     !Calculates the Bullock et al. (2001) mass-concentration relation
@@ -748,9 +757,9 @@ CONTAINS
     TYPE(cosmology) :: cosm
     TYPE(tables) :: lut
     REAL :: dc
-    REAL :: amin, amax, af, zf, RHS, a, growz
+    REAL :: af, zf, RHS, a, growz
     REAL, ALLOCATABLE :: af_tab(:), grow_tab(:)
-    INTEGER :: i, j, ntab
+    INTEGER :: i, ntab
 
     !This fills up the halo collapse redshift table as per Bullock relations       
 
@@ -770,12 +779,12 @@ CONTAINS
        RHS=dc*grow(z,cosm)/lut%sigf(i)
 
        a=1./(1.+z)
-       growz=find(a,af_tab,grow_tab,3,3)
+       growz=find(a,af_tab,grow_tab,cosm%ng,3,3)
 
        IF(RHS>growz) THEN
           zf=z
        ELSE
-          af=find(RHS,grow_tab,af_tab,3,3)
+          af=find(RHS,grow_tab,af_tab,cosm%ng,3,3)
           zf=-1.+1./af
        END IF
 
@@ -793,7 +802,7 @@ CONTAINS
     IMPLICIT NONE
     REAL :: mass_r, r
     TYPE(cosmology) :: cosm
-    REAL, PARAMETER :: pi=3.141592654
+    !REAL, PARAMETER :: pi=3.141592654
 
     !Relation between mean cosmological mass and radius
     mass_r=(4.*pi/3.)*cosmic_density(cosm)*(r**3.)
@@ -895,7 +904,7 @@ CONTAINS
     END IF
     tb=(tb+ab*fac/(1.+(bb/rk/s)**3.))*sin(rk*ss)/rk/ss
 
-    tk_eh=(om_b/om_m)*tb+(1-om_b/om_m)*tc
+    tk_eh=real((om_b/om_m)*tb+(1-om_b/om_m)*tc)
 
   END FUNCTION TK_EH
 
@@ -962,13 +971,13 @@ CONTAINS
     REAL, ALLOCATABLE :: integrand(:)
     REAL :: sum
     INTEGER :: i
-    REAL, PARAMETER :: pi=3.141592654
+    !REAL, PARAMETER :: pi=3.141592654
 
     !Does the one-halo power integral
 
     ALLOCATE(integrand(lut%n))
     integrand=0.
-    
+
     !Only call eta once
     et=eta(z,cosm)
 
@@ -978,10 +987,11 @@ CONTAINS
        wk=win(k*(lut%nu(i)**et),lut%rv(i),lut%c(i))
        integrand(i)=(lut%rv(i)**3.)*g*(wk**2.)
     END DO
-    
+
     !Carries out the integration
-    sum=inttab(lut%nu,REAL(integrand),1)
-    
+    !Important to use basic trapezium rule because the integrand is messy
+    sum=inttab(lut%nu,REAL(integrand),lut%n,1)
+
     DEALLOCATE(integrand)
 
     Dv=Delta_v(z,cosm)
@@ -1010,19 +1020,17 @@ CONTAINS
 
   SUBROUTINE fill_sigtab(cosm)
 
+    !This fills up tables of r vs. sigma(r) across a range in r!
+    !It is used only in look-up for further calculations of sigma(r) and not otherwise!
+    !and prevents a large number of calls to the sigint functions
     USE cosdef
     IMPLICIT NONE
     REAL :: rmin, rmax
     REAL, ALLOCATABLE :: rtab(:), sigtab(:)
     REAL :: r, sig
-    INTEGER :: i, nsig
+    INTEGER :: i
+    INTEGER, PARAMETER :: nsig=64 !Number of entries for sigma(R) tables
     TYPE(cosmology) :: cosm
-
-    !This fills up tables of r vs. sigma(r) across a range in r!
-    !It is used only in look-up for further calculations of sigma(r) and not otherwise!
-    !and prevents a large number of calls to the sigint functions
-    !rmin and rmax need to be decided in advance and are chosen such that
-    !R vs. sigma(R) is approximately power-law below and above these values of R   
 
     !These must be not allocated before sigma calculations otherwise when sigma(r) is called
     !otherwise sigma(R) looks for the result in the tables
@@ -1031,9 +1039,11 @@ CONTAINS
 
     !These values of 'r' work fine for any power spectrum of cosmological importance
     !Having nsig as a 2** number is most efficient for the look-up routines
+    !rmin and rmax need to be decided in advance and are chosen such that
+    !R vs. sigma(R) is a power-law below and above these values of R   
     rmin=1e-4
     rmax=1e3
-    nsig=64
+    cosm%nsig=nsig
 
     IF(ihm==1) WRITE(*,*) 'SIGTAB: Filling sigma interpolation table'
     IF(ihm==1) WRITE(*,*) 'SIGTAB: Rmin:', rmin
@@ -1048,7 +1058,7 @@ CONTAINS
        r=exp(log(rmin)+log(rmax/rmin)*float(i-1)/float(nsig-1))
 
        sig=sigma(r,0.,cosm)
-       
+
        rtab(i)=r
        sigtab(i)=sig
 
@@ -1079,6 +1089,8 @@ CONTAINS
        sigma=sigint0(r,z,cosm)
     ELSE IF(r<1.e-2) THEN
        sigma=sqrt(sigint1(r,z,cosm)+sigint2(r,z,cosm))
+    ELSE
+       STOP 'SIGMA: Error, something went wrong'
     END IF
 
   END FUNCTION sigma
@@ -1089,11 +1101,10 @@ CONTAINS
     IMPLICIT NONE
     REAL :: sigma_v
     REAL, INTENT(IN) :: z, R
-    REAL*8 :: sum
-    REAL :: alpha_min, alpha_max, alpha
-    INTEGER :: l, nmax
-    REAL :: dtheta, k, theta, oldsum, acc
-    REAL, PARAMETER :: pi=3.141592654
+    REAL*8 :: sum, oldsum
+    REAL :: alpha
+    REAL :: dtheta, k, theta, acc
+    !REAL, PARAMETER :: pi=3.141592654
     INTEGER :: i, j, n, ninit, jmax
     TYPE(cosmology), INTENT(IN) :: cosm
 
@@ -1124,8 +1135,10 @@ CONTAINS
 
        IF(j>1 .AND. ABS(-1.+sum/oldsum)<acc) THEN
           !Convert from sigma_v^2 and to 1D dispersion
-          sigma_v=sqrt(sum/3.)
+          sigma_v=real(sqrt(sum/3.d0))
           EXIT
+       ELSE IF(j==jmax) THEN
+          STOP 'SIGMA_V: Error, integration timed out'
        ELSE
           oldsum=sum
        END IF
@@ -1139,20 +1152,20 @@ CONTAINS
     USE cosdef
     REAL :: sigma_cb
     REAL, INTENT(IN) :: r, z
-    REAL :: a
     TYPE(cosmology), INTENT(IN) :: cosm
 
     !Finds sigma_cold from look-up tables
     !In this version sigma_cold=sigma
-    
-    sigma_cb=grow(z,cosm)*exp(find(log(r),log(cosm%r_sigma),log(cosm%sigma),3,3))
+
+    sigma_cb=grow(z,cosm)*exp(find(log(r),log(cosm%r_sigma),log(cosm%sigma),cosm%nsig,3,3))
 
   END FUNCTION sigma_cb
 
   FUNCTION wk_tophat(x)
 
     IMPLICIT NONE
-    REAL :: wk_tophat, x
+    REAL :: wk_tophat
+    REAL, INTENT(IN) :: x
 
     !The normlaised Fourier Transform of a top-hat
     !Taylor expansion used for low |x| to avoid cancellation problems
@@ -1165,24 +1178,19 @@ CONTAINS
 
   END FUNCTION wk_tophat
 
-  FUNCTION inttab(x,y,iorder)
+  FUNCTION inttab(x,y,n,iorder)
 
+    !Integrates tables y(x)dx
     IMPLICIT NONE
     REAL :: inttab
-    REAL, INTENT(IN) :: x(:), y(:)
+    INTEGER, INTENT(IN) :: n
+    REAL, INTENT(IN) :: x(n), y(n)
     REAL :: a, b, c, d, h
     REAL :: q1, q2, q3, qi, qf
     REAL :: x1, x2, x3, x4, y1, y2, y3, y4, xi, xf
     REAL*8 :: sum
-    INTEGER :: i, n, i1, i2, i3, i4
+    INTEGER :: i, i1, i2, i3, i4
     INTEGER, INTENT(IN) :: iorder
-
-    !Routine to integrate tables of data using the trapezium rule
-    !Can either use linear, quadratic or cubic methods
-
-    n=SIZE(x)
-
-    IF(n .NE. SIZE(y)) STOP 'Tables must be of the same length'
 
     sum=0.d0
 
@@ -1281,9 +1289,13 @@ CONTAINS
 
        END DO
 
+    ELSE
+
+       STOP 'INTTAB: Error, order not specified correctly'
+
     END IF
 
-    inttab=sum
+    inttab=REAL(sum)
 
   END FUNCTION inttab
 
@@ -1363,7 +1375,7 @@ CONTAINS
 
     ninit=50
     jmax=20
-    
+
     DO j=1,jmax
 
        n=ninit*2**(j-1)
@@ -1382,10 +1394,8 @@ CONTAINS
        sum2=sum2*dx
        sum2=sqrt(sum2)
 
-       IF(j==1) THEN
-          sum1=sum2
-       ELSE IF(ABS(-1.+sum2/sum1)<acc) THEN
-          sigint0=sum2
+       IF(j .NE. 1 .AND. ABS(-1.+sum2/sum1)<acc) THEN
+          sigint0=real(sum2)
           EXIT
        ELSE IF(j==jmax) THEN
           WRITE(*,*)
@@ -1426,7 +1436,7 @@ CONTAINS
 
     xmin=r/(r+r**.5)
     xmax=1.
-    
+
     DO j=1,jmax
 
        n=ninit*2**(j-1)
@@ -1451,7 +1461,7 @@ CONTAINS
        sum2=sum2*dx
 
        IF(j .NE. 1 .AND. ABS(-1.+sum2/sum1)<acc) THEN
-          sigint1=sum2
+          sigint1=real(sum2)
           EXIT
        ELSE IF(j==jmax) THEN
           WRITE(*,*)
@@ -1495,7 +1505,7 @@ CONTAINS
 
     xmin=1./r
     xmax=A/r
-    
+
     DO j=1,jmax
 
        n=ninit*2**(j-1)
@@ -1508,7 +1518,7 @@ CONTAINS
              fac=0.5
           ELSE
              fac=1.
-          END IF          
+          END IF
 
           !Integrate linearly in k for the rapidly oscillating part
           sum2=sum2+fac*p_lin(x,z,cosm)*(wk_tophat(x*r)**2.)/x
@@ -1519,7 +1529,7 @@ CONTAINS
        sum2=sum2*dx
 
        IF(j .NE. 1 .AND. ABS(-1.+sum2/sum1)<acc) THEN
-          sigint2=sum2
+          sigint2=real(sum2)
           EXIT
        ELSE IF(j==jmax) THEN
           WRITE(*,*)
@@ -1629,7 +1639,7 @@ CONTAINS
     om_m=cosm%om_m
     om_v=cosm%om_v
     a=1./(1.+z)
-    hubble2=(om_m*(1.+z)**3.)+om_v*x_de(a,cosm)+((1.-om_m-om_v)*(1.+z)**2.)
+    hubble2=(om_m*(1.+z)**3.)+om_v*X_de(a,cosm)+((1.-om_m-om_v)*(1.+z)**2.)
 
   END FUNCTION hubble2
 
@@ -1648,29 +1658,13 @@ CONTAINS
 
   END FUNCTION omega_m
 
-  FUNCTION omega_v(z,cosm)
-    
-    USE cosdef
-    IMPLICIT NONE
-    REAL :: omega_v
-    REAL, INTENT(IN) :: z
-    REAL :: om_v, a
-    TYPE(cosmology), INTENT(IN) :: cosm
-
-    !This calculates omega_v (really omega_de) variations with z!
-    om_v=cosm%om_v
-    a=1./(1.+z)
-    omega_v=om_v*x_de(a,cosm)/hubble2(z,cosm)
-
-  END FUNCTION omega_v
-
   FUNCTION grow(z,cosm)
 
     USE cosdef
     IMPLICIT NONE
     REAL :: grow
     REAL, INTENT(IN) :: z
-    REAL :: a, acc
+    REAL :: a
     TYPE(cosmology), INTENT(IN) :: cosm
 
     !Scale-independent growth function at z=0
@@ -1678,7 +1672,7 @@ CONTAINS
        grow=1.
     ELSE
        a=1./(1.+z)
-       grow=find(a,cosm%a_growth,cosm%growth,3,3)
+       grow=find(a,cosm%a_growth,cosm%growth,cosm%ng,3,3)
     END IF
 
   END FUNCTION grow
@@ -1701,7 +1695,7 @@ CONTAINS
     jmax=20
 
     a=1.
-    
+
     IF(cosm%wa .NE. 0.) STOP 'This does not work for w(a)'
 
     IF(a==b) THEN
@@ -1712,7 +1706,7 @@ CONTAINS
 
        DO j=1,jmax
 
-          nint=10.*(2.**j)
+          nint=10*(2**j)
 
           DO i=1,nint
 
@@ -1744,8 +1738,10 @@ CONTAINS
           sum2=sum2*dx/2.
 
           IF(j .NE. 1 .AND. ABS(-1.+sum2/sum1)<acc) THEN
-             grow_int=exp(sum2)
+             grow_int=real(exp(sum2))
              EXIT
+          ELSE IF(j==jmax) THEN
+             STOP 'GROW_INT: Error, integration timed out'
           ELSE
              sum1=sum2
              sum2=0.d0
@@ -1763,9 +1759,9 @@ CONTAINS
     IMPLICIT NONE
     REAL :: dispint
     REAL, INTENT(IN) :: z
-    REAL*8 :: sum
-    REAL :: dtheta, k, theta, oldsum, acc
-    REAL, PARAMETER :: pi=3.141592654
+    REAL*8 :: sum, oldsum
+    REAL :: dtheta, k, theta, acc
+    !REAL, PARAMETER :: pi=3.141592654
     INTEGER :: i, j, n, ninit, jmax
     TYPE(cosmology), INTENT(IN) :: cosm
 
@@ -1793,8 +1789,10 @@ CONTAINS
        sum=sum*dtheta
 
        IF(j>1 .AND. ABS(-1.+sum/oldsum)<acc) THEN  
-          dispint=sum/3.
+          dispint=real(sum/3.d0)
           EXIT
+       ELSE IF(j==jmax) THEN
+          STOP 'SIGMA_V: Error, integration timed out'
        ELSE
           oldsum=sum
        END IF
@@ -1803,12 +1801,13 @@ CONTAINS
 
   END FUNCTION dispint
 
-  FUNCTION si(x)
+  FUNCTION Si(x)
 
     IMPLICIT NONE
-    REAL :: si, x
+    REAL :: Si
+    REAL, INTENT(IN) :: x
     REAL*8 :: x2, y, f, g, si8
-    REAL*8, PARAMETER :: pi=3.1415926535897932384626433d0
+    REAL*8, PARAMETER :: pi8=3.1415926535897932384626433d0
 
     !Expansions for high and low x thieved from Wikipedia, two different expansions for above and below 4.
 
@@ -1823,7 +1822,7 @@ CONTAINS
             x2*(1.55654986308745614d-7+x2*(3.28067571055789734d-10+x2*(4.5049097575386581d-13&
             +x2*(3.21107051193712168d-16)))))))
 
-       si=si8
+       si=real(si8)
 
     ELSE IF(ABS(x)>4.) THEN
 
@@ -1848,16 +1847,21 @@ CONTAINS
             + y*(2.23355543278099360d9 + y*(7.87465017341829930d10 + y*(1.39866710696414565d12 &
             + y*(1.17164723371736605d13 + y*(4.01839087307656620d13 +y*(3.99653257887490811d13))))))))))
 
-       si=pi/2.d0-f*cos(x)-g*sin(x)
+       si=real(pi8/2.d0-f*cos(x)-g*sin(x))
+
+    ELSE
+
+       STOP 'ERROR: Si, something went wrong'
 
     END IF
 
-  END FUNCTION si
+  END FUNCTION Si
 
-  FUNCTION ci(x)
+  FUNCTION Ci(x)
 
     IMPLICIT NONE
-    REAL :: ci, x
+    REAL :: Ci
+    REAL, INTENT(IN) :: x
     REAL*8 :: x2, y, f, g, ci8
     REAL*8, PARAMETER :: em_const=0.577215664901532861d0
 
@@ -1873,7 +1877,7 @@ CONTAINS
             x2*(6.72126800814254432d-5+x2*(2.55533277086129636d-7+x2*(6.97071295760958946d-10+&
             x2*(1.38536352772778619d-12+x2*(1.89106054713059759d-15+x2*(1.39759616731376855d-18))))))))
 
-       ci=ci8
+       ci=real(ci8)
 
     ELSE IF(ABS(x)>4.) THEN
 
@@ -1896,22 +1900,28 @@ CONTAINS
             y*(3.26026661647090822d7 + y*(2.23355543278099360d9 + y*(7.87465017341829930d10 &
             + y*(1.39866710696414565d12 + y*(1.17164723371736605d13 + y*(4.01839087307656620d13 +y*(3.99653257887490811d13))))))))))
 
-       ci=f*sin(x)-g*cos(x)
+       ci=real(f*sin(x)-g*cos(x))
+
+    ELSE
+
+       STOP 'ERROR: Ci, something went wrong'
 
     END IF
 
-  END FUNCTION ci
+  END FUNCTION Ci
 
-   FUNCTION derivative_table(x,xin,yin,iorder,imeth)
+  FUNCTION derivative_table(x,xin,yin,n,iorder,imeth)
 
+    !Given two arrays x and y such that y=y(x) this uses interpolation to calculate the derivative y'(x_i) at position x_i
     IMPLICIT NONE
     REAL :: derivative_table
-    REAL, INTENT(IN) :: x, xin(:), yin(:)
+    INTEGER, INTENT(IN) :: n
+    REAL, INTENT(IN) :: x, xin(n), yin(n)
     REAL, ALLOCATABLE ::  xtab(:), ytab(:)
     REAL :: a, b, c, d
     REAL :: x1, x2, x3, x4
     REAL :: y1, y2, y3, y4
-    INTEGER :: i, n
+    INTEGER :: i
     INTEGER, INTENT(IN) :: imeth, iorder
     INTEGER :: maxorder, maxmethod
 
@@ -1927,13 +1937,9 @@ CONTAINS
     !iorder = 2 => quadratic interpolation
     !iorder = 3 => cubic interpolation
 
-    n=SIZE(xtab)
-
     maxorder=3
     maxmethod=3
 
-    n=SIZE(xin)
-    IF(n .NE. SIZE(yin)) STOP 'FIND: Tables not of the same size'
     ALLOCATE(xtab(n),ytab(n))
 
     xtab=xin
@@ -1941,25 +1947,18 @@ CONTAINS
 
     IF(xtab(1)>xtab(n)) THEN
        !Reverse the arrays in this case
-       CALL reverse(xtab)
-       CALL reverse(ytab)
+       CALL reverse(xtab,n)
+       CALL reverse(ytab,n)
     END IF
 
-    IF(iorder<1) STOP 'FIND: find order not specified correctly'
-    IF(iorder>maxorder) STOP 'FIND: find order not specified correctly'
-    IF(imeth<1) STOP 'FIND: Method of finding within a table not specified correctly'
-    IF(imeth>maxmethod) STOP 'FIND: Method of finding within a table not specified correctly'
-
-!    IF(xtab(1)>xtab(n)) STOP 'DERIVATIVE_TABLE: x table in wrong order'
-!    IF(n .NE. SIZE(ytab)) STOP 'DERIVATIVE_TABLE: Tables not of the same size'
-!    IF(iorder<1) STOP 'DERIVATIVE_TABLE: find order not specified correctly'
-!    IF(iorder>maxorder) STOP 'DERIVATIVE_TABLE: find order not specified correctly'
-!    IF(imeth<1) STOP 'DERIVATIVE_TABLE: Method of finding within a table not specified correctly'
-!    IF(imeth>maxmethod) STOP 'DERIVATIVE_TABLE: Method of finding within a table not specified correctly'
+    IF(iorder<1) STOP 'DERIVATIVE_TABLE: find order not specified correctly'
+    IF(iorder>maxorder) STOP 'DERIVATIVE_TABLE: find order not specified correctly'
+    IF(imeth<1) STOP 'DERIVATIVE_TABLE: Method of finding within a table not specified correctly'
+    IF(imeth>maxmethod) STOP 'DERIVATIVE_TABLE: Method of finding within a table not specified correctly'
 
     IF(iorder==1) THEN
 
-       IF(n<2) STOP 'FIND: Not enough points in your table for linear interpolation'
+       IF(n<2) STOP 'DERIVATIVE_TABLE: Not enough points in your table for linear interpolation'
 
        IF(x<=xtab(2)) THEN
 
@@ -1979,7 +1978,10 @@ CONTAINS
 
        ELSE
 
-          i=table_integer(x,xtab,imeth)
+          i=table_integer(x,xtab,n,imeth)
+          !IF(imeth==1) i=search_int(x,xtab)
+          !IF(imeth==2) i=linear_table_integer(x,xtab)
+          !IF(imeth==3) i=int_split(x,xtab)
 
           x2=xtab(i+1)
           x1=xtab(i)
@@ -1994,7 +1996,7 @@ CONTAINS
 
     ELSE IF(iorder==2) THEN
 
-       IF(n<3) STOP 'FIND_QUADRATIC: Not enough points in your table'
+       IF(n<3) STOP 'DERIVATIVE_TABLE: Not enough points in your table'
 
        IF(x<=xtab(2) .OR. x>=xtab(n-1)) THEN
 
@@ -2026,7 +2028,10 @@ CONTAINS
 
        ELSE
 
-          i=table_integer(x,xtab,imeth)
+          i=table_integer(x,xtab,n,imeth)
+          !IF(imeth==1) i=search_int(x,xtab)
+          !IF(imeth==2) i=linear_table_integer(x,xtab)
+          !IF(imeth==3) i=int_split(x,xtab)
 
           x1=xtab(i-1)
           x2=xtab(i)
@@ -2052,7 +2057,7 @@ CONTAINS
 
     ELSE IF(iorder==3) THEN
 
-       IF(n<4) STOP 'FIND_CUBIC: Not enough points in your table'
+       IF(n<4) STOP 'DERIVATIVE_TABLE: Not enough points in your table'
 
        IF(x<=xtab(3)) THEN
 
@@ -2080,8 +2085,11 @@ CONTAINS
 
        ELSE
 
-          i=table_integer(x,xtab,imeth)
-          
+          i=table_integer(x,xtab,n,imeth)
+          !IF(imeth==1) i=search_int(x,xtab)
+          !IF(imeth==2) i=linear_table_integer(x,xtab)
+          !IF(imeth==3) i=int_split(x,xtab)
+
           x1=xtab(i-1)
           x2=xtab(i)
           x3=xtab(i+1)
@@ -2097,25 +2105,31 @@ CONTAINS
        CALL fit_cubic(a,b,c,d,x1,y1,x2,y2,x3,y3,x4,y4)
        derivative_table=3.*a*(x**2.)+2.*b*x+c
 
+    ELSE
+
+       STOP 'DERIVATIVE_TABLE: Error, iorder not specified correctly'
+
     END IF
 
   END FUNCTION derivative_table
 
-  FUNCTION find(x,xin,yin,iorder,imeth)
+  FUNCTION find(x,xin,yin,n,iorder,imeth)
 
+    !Given two arrays x and y this routine interpolates to find the y_i value at position x_i
     IMPLICIT NONE
     REAL :: find
-    REAL, INTENT(IN) :: x, xin(:), yin(:)
+    INTEGER, INTENT(IN) :: n
+    REAL, INTENT(IN) :: x, xin(n), yin(n)
     REAL, ALLOCATABLE ::  xtab(:), ytab(:)
     REAL :: a, b, c, d
     REAL :: x1, x2, x3, x4
     REAL :: y1, y2, y3, y4
-    INTEGER :: i, n
+    INTEGER :: i
     INTEGER, INTENT(IN) :: imeth, iorder
-    INTEGER :: maxorder, maxmethod
 
     !This version interpolates if the value is off either end of the array!
-    !Insert 'x, xtab' or ytab as log if this gives better results from the interpolation
+    !Care should be chosen to insert x, xtab, ytab as log if this might give better!
+    !Results from the interpolation!
 
     !If the value required is off the table edge the interpolation is always linear
 
@@ -2127,8 +2141,6 @@ CONTAINS
     !iorder = 2 => quadratic interpolation
     !iorder = 3 => cubic interpolation
 
-    n=SIZE(xin)
-    IF(n .NE. SIZE(yin)) STOP 'FIND: Tables not of the same size'
     ALLOCATE(xtab(n),ytab(n))
 
     xtab=xin
@@ -2136,8 +2148,8 @@ CONTAINS
 
     IF(xtab(1)>xtab(n)) THEN
        !Reverse the arrays in this case
-       CALL reverse(xtab)
-       CALL reverse(ytab)
+       CALL reverse(xtab,n)
+       CALL reverse(ytab,n)
     END IF
 
     IF(x<xtab(1)) THEN
@@ -2152,11 +2164,11 @@ CONTAINS
 
        CALL fit_line(a,b,x1,y1,x2,y2)
        find=a*x+b
-       
+
     ELSE IF(x>xtab(n)) THEN
 
        !Do a linear interpolation beyond the table boundary
-       
+
        x1=xtab(n-1)
        x2=xtab(n)
 
@@ -2188,8 +2200,8 @@ CONTAINS
 
        ELSE
 
-          i=table_integer(x,xtab,imeth)
-          
+          i=table_integer(x,xtab,n,imeth)
+
           x1=xtab(i)
           x2=xtab(i+1)
 
@@ -2235,7 +2247,7 @@ CONTAINS
 
        ELSE
 
-          i=table_integer(x,xtab,imeth)
+          i=table_integer(x,xtab,n,imeth)
 
           x1=xtab(i-1)
           x2=xtab(i)
@@ -2289,7 +2301,7 @@ CONTAINS
 
        ELSE
 
-          i=table_integer(x,xtab,imeth)
+          i=table_integer(x,xtab,n,imeth)
 
           x1=xtab(i-1)
           x2=xtab(i)
@@ -2314,31 +2326,34 @@ CONTAINS
 
   END FUNCTION find
 
-  FUNCTION table_integer(x,xtab,imeth)
+  FUNCTION table_integer(x,xtab,n,imeth)
 
+    !Chooses between ways to find the integer location below some value in an array
     IMPLICIT NONE
-    INTEGER :: table_integer 
-    REAL, INTENT(IN) :: x, xtab(:)
+    INTEGER :: table_integer
+    INTEGER, INTENT(IN) :: n
+    REAL, INTENT(IN) :: x, xtab(n)
     INTEGER, INTENT(IN) :: imeth
 
     IF(imeth==1) THEN
-       table_integer=linear_table_integer(x,xtab)
+       table_integer=linear_table_integer(x,xtab,n)
     ELSE IF(imeth==2) THEN
-       table_integer=search_int(x,xtab)
+       table_integer=search_int(x,xtab,n)
     ELSE IF(imeth==3) THEN
-       table_integer=int_split(x,xtab)
+       table_integer=int_split(x,xtab,n)
     ELSE
        STOP 'TABLE INTEGER: Method specified incorrectly'
     END IF
 
   END FUNCTION table_integer
 
-  FUNCTION linear_table_integer(x,xtab)
+  FUNCTION linear_table_integer(x,xtab,n)
 
+    !Assuming the table is exactly linear this gives you the integer position
     IMPLICIT NONE
     INTEGER :: linear_table_integer
-    REAL, INTENT(IN) :: x, xtab(:)
-    INTEGER :: n
+    INTEGER, INTENT(IN) :: n
+    REAL, INTENT(IN) :: x, xtab(n)
     REAL :: x1, x2, xn
     REAL :: acc
 
@@ -2346,7 +2361,7 @@ CONTAINS
     !eg. if x(3)=6. and x(4)=7. and x=6.5 this will return 6
     !Assumes table is organised linearly (care for logs)
 
-    n=SIZE(xtab)
+    !n=SIZE(xtab)
     x1=xtab(1)
     x2=xtab(2)
     xn=xtab(n)
@@ -2361,17 +2376,14 @@ CONTAINS
 
   END FUNCTION linear_table_integer
 
-  FUNCTION search_int(x,xtab)
+  FUNCTION search_int(x,xtab,n)
 
+    !Does a stupid search through the table from beginning to end to find integer
     IMPLICIT NONE
     INTEGER :: search_int
-    INTEGER :: i, n
-    REAL, INTENT(IN) :: x, xtab(:)
-
-    !Searches for the point in the table brute force.
-    !This is usually a stupid thing to do
-
-    n=SIZE(xtab)
+    INTEGER, INTENT(IN) :: n
+    REAL, INTENT(IN) :: x, xtab(n)
+    INTEGER :: i
 
     IF(xtab(1)>xtab(n)) STOP 'SEARCH_INT: table in wrong order'
 
@@ -2383,16 +2395,14 @@ CONTAINS
 
   END FUNCTION search_int
 
-  FUNCTION int_split(x,xtab)
-
-    IMPLICIT NONE
-    REAL, INTENT(IN) :: x, xtab(:)
-    INTEGER :: i1, i2, imid, n
-    INTEGER :: int_split
+  FUNCTION int_split(x,xtab,n)
 
     !Finds the position of the value in the table by continually splitting it in half
-
-    n=SIZE(xtab)
+    IMPLICIT NONE
+    INTEGER :: int_split
+    INTEGER, INTENT(IN) :: n
+    REAL, INTENT(IN) :: x, xtab(n)
+    INTEGER :: i1, i2, imid
 
     IF(xtab(1)>xtab(n)) STOP 'INT_SPLIT: table in wrong order'
 
@@ -2419,11 +2429,10 @@ CONTAINS
 
   SUBROUTINE fit_line(a1,a0,x1,y1,x2,y2)
 
+    !Given xi, yi i=1,2 fits a line between these points
     IMPLICIT NONE
     REAL, INTENT(OUT) :: a0, a1
-    REAL, INTENT(IN) :: x1, y1, x2, y2
-
-    !Given xi, yi i=1,2 fits a line between these points
+    REAL, INTENT(IN) :: x1, y1, x2, y2   
 
     a1=(y2-y1)/(x2-x1)
     a0=y1-a1*x1
@@ -2432,11 +2441,10 @@ CONTAINS
 
   SUBROUTINE fit_quadratic(a2,a1,a0,x1,y1,x2,y2,x3,y3)
 
+    !Given xi, yi i=1,2,3 fits a quadratic between these points
     IMPLICIT NONE
     REAL, INTENT(OUT) :: a0, a1, a2
-    REAL, INTENT(IN) :: x1, y1, x2, y2, x3, y3
-
-    !Given xi, yi i=1,2,3 fits a quadratic between these points
+    REAL, INTENT(IN) :: x1, y1, x2, y2, x3, y3   
 
     a2=((y2-y1)/(x2-x1)-(y3-y1)/(x3-x1))/(x2-x3)
     a1=(y2-y1)/(x2-x1)-a2*(x2+x1)
@@ -2446,12 +2454,11 @@ CONTAINS
 
   SUBROUTINE fit_cubic(a,b,c,d,x1,y1,x2,y2,x3,y3,x4,y4)
 
+    !Given xi, yi i=1,2,3,4 fits a cubic between these points
     IMPLICIT NONE
     REAL, INTENT(OUT) :: a, b, c, d
     REAL, INTENT(IN) :: x1, y1, x2, y2, x3, y3, x4, y4
-    REAL :: f1, f2, f3
-
-    !Given xi, yi i=1,2,3,4 fits a cubic between these points
+    REAL :: f1, f2, f3    
 
     f1=(y4-y1)/((x4-x2)*(x4-x1)*(x4-x3))
     f2=(y3-y1)/((x3-x2)*(x3-x1)*(x4-x3))
@@ -2475,16 +2482,14 @@ CONTAINS
 
   END SUBROUTINE fit_cubic
 
-  SUBROUTINE reverse(arry)
+  SUBROUTINE reverse(arry,n)
 
+    !This reverses the contents of arry!
     IMPLICIT NONE
-    INTEGER :: n, i
-    REAL, ALLOCATABLE :: hold(:)
-    REAL :: arry(:)
-
-    !This reverses the contents of 'arry'
-
-    n=SIZE(arry)
+    INTEGER, INTENT(IN) :: n
+    REAL, INTENT(INOUT) :: arry(n)
+    INTEGER :: i
+    REAL, ALLOCATABLE :: hold(:) 
 
     ALLOCATE(hold(n))
 
@@ -2524,14 +2529,16 @@ CONTAINS
 
   SUBROUTINE fill_growtab(cosm)
 
+    !Fills a table of the growth function vs. a
     USE cosdef
     IMPLICIT NONE
     TYPE(cosmology) :: cosm
-    INTEGER :: i, n
+    INTEGER :: i
     REAL :: a, norm
     REAL, ALLOCATABLE :: d_tab(:), v_tab(:), a_tab(:)
     REAL :: ainit, amax, dinit, vinit
     REAL :: acc
+    INTEGER, PARAMETER :: n=64 !Number of entries for growth tables
 
     !The calculation should start at a z when Om_m(z)=1., so that the assumption
     !of starting in the g\propto a growing mode is valid (this will not work for early DE)
@@ -2551,7 +2558,7 @@ CONTAINS
     IF(ihm==1) WRITE(*,*) 'GROWTH: ODE done'
 
     !Normalise so that g(z=0)=1
-    norm=find(1.,a_tab,d_tab,3,3)
+    norm=find(1.,a_tab,d_tab,SIZE(a_tab),3,3)
     IF(ihm==1) WRITE(*,*) 'GROWTH: unnormalised g(a=1):', norm
     d_tab=d_tab/norm
     IF(ihm==1) WRITE(*,*)
@@ -2559,13 +2566,14 @@ CONTAINS
     !This downsamples the tables that come out of the ODE solver (which can be a bit long)
     !Could use some table-interpolation routine here to save time
     IF(ALLOCATED(cosm%a_growth)) DEALLOCATE(cosm%a_growth,cosm%growth)
-    n=64
+    cosm%ng=n
+    
     ALLOCATE(cosm%a_growth(n),cosm%growth(n))
     DO i=1,n
        a=ainit+(amax-ainit)*float(i-1)/float(n-1)
        cosm%a_growth(i)=a
-       cosm%growth(i)=find(a,a_tab,d_tab,3,3)
-    END DO  
+       cosm%growth(i)=find(a,a_tab,d_tab,SIZE(a_tab),3,3)
+    END DO
 
   END SUBROUTINE fill_growtab
 
@@ -2682,9 +2690,9 @@ CONTAINS
 
        IF(ifail==0) THEN
           ALLOCATE(x(n),t(n),v(n))
-          x=x8
-          v=v8
-          t=t8
+          x=real(x8)
+          v=real(v8)
+          t=real(t8)
           EXIT
        END IF
 
@@ -2726,10 +2734,10 @@ CONTAINS
     REAL :: fd
     REAL, INTENT(IN) :: d, v, k, a
     TYPE(cosmology), INTENT(IN) :: cosm
-    
+
     !Needed for growth function solution
     !This is the fd in \dot{\delta}=fd
-    
+
     fd=v
 
   END FUNCTION fd
@@ -2747,24 +2755,24 @@ CONTAINS
 
     a=1./(1.+z)
 
-    AH=cosm%om_m*(a**(-3.))+cosm%om_v*(1.+3.*w_de(a,cosm))*x_de(a,cosm)
+    AH=cosm%om_m*(a**(-3.))+cosm%om_v*(1.+3.*w_de(a,cosm))*X_de(a,cosm)
 
     AH=-AH/2.
 
   END FUNCTION AH
 
-  FUNCTION x_de(a,cosm)
+  FUNCTION X_de(a,cosm)
 
     USE cosdef
     IMPLICIT NONE
-    REAL :: x_de
+    REAL :: X_de
     REAL, INTENT(IN) :: a
     TYPE(cosmology), INTENT(IN) :: cosm
 
     !The time evolution for Om_w for w(a) DE models
-    x_de=(a**(-3.*(1.+cosm%w+cosm%wa)))*exp(-3.*cosm%wa*(1.-a))
+    X_de=(a**(-3.*(1.+cosm%w+cosm%wa)))*exp(-3.*cosm%wa*(1.-a))
 
-  END FUNCTION x_de
+  END FUNCTION X_de
 
   FUNCTION w_de(a,cosm)
 
@@ -2776,7 +2784,7 @@ CONTAINS
 
     !w(a) for DE models
     w_de=cosm%w+(1.-a)*cosm%wa
-    
+
   END FUNCTION w_de
 
 END PROGRAM HMcode
