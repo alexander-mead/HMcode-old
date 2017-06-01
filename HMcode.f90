@@ -6,7 +6,6 @@ MODULE cosdef
      REAL :: A
      REAL, ALLOCATABLE :: r_sigma(:), sigma(:)
      REAL, ALLOCATABLE :: growth(:), a_growth(:)
-     !REAL, ALLOCATABLE :: ktab(:), tktab(:), pktab(:)
      INTEGER :: nsig, ng
   END TYPE cosmology
 
@@ -26,30 +25,31 @@ PROGRAM HMcode
   REAL :: z
   REAL :: p1h, p2h, pfull, plin
   REAL, ALLOCATABLE :: k(:), ztab(:), ptab(:,:)
-  INTEGER :: i, j, nk, nz
-  INTEGER :: ihm, imead
+  INTEGER :: i, j, l, nk, nz
+  INTEGER :: ihm
   REAL :: kmin, kmax, zmin, zmax
   REAL, PARAMETER :: pi=3.141592654
   TYPE(cosmology) :: cosi
   TYPE(tables) :: lut
   CHARACTER(len=64) :: output
 
-  !19.09.16 - changed subroutines so that none assume an array size
+  !imead parameter
+  !0 - Do the standard halo model calculation (Dv=200, dc=1.686, Sheth & Tormen (199) mass function, Bullock (2001) c(M)'
+  !1 - Do the accurate calculation detailed in Mead et al. (2015; 1505.07833) with updates from Mead et al. (2016; 1602.02154)
+  INTEGER, PARAMETER :: imead=1
+
+  !2016/09/19 - changed subroutines so that none assume an array size
+  !2017/06/01 - added comments, made recompatible with ifort
 
   !HMcode developed by Alexander Mead
   !If you use this in your work please cite the original paper: http://arxiv.org/abs/1505.07833 and maybe the update: http://arxiv.org/abs/1602.02154
   !and consider citing the source code at ASCL: http://ascl.net/1508.001
 
-  !ihm
+  !ihm parameter
   !0 - Non-verbose
   !1 - Verbose
   ihm=1
-
-  !imead
-  !0 - Do the standard halo model calculation (Dv=200, dc=1.686, Sheth & Tormen (199) mass function, Bullock (2001) c(M)'
-  !1 - Do the accurate calculation detailed in Mead et al. (2015; 1505.07833) with updates from Mead et al. (2016; 1602.02154)
-  imead=1
-
+ 
   WRITE(*,*)
   WRITE(*,*) 'Welcome to HMcode'
   WRITE(*,*) '================='
@@ -90,10 +90,10 @@ PROGRAM HMcode
   !Normalises power spectrum (via sigma_8) and fills sigma(R) look-up tables
   CALL initialise_cosmology(cosi)
 
-  !Ignore this, only useful for bug tests
-  !CALL RNG_set(0)
-  !DO
-  !CALL random_cosmology(cosi)
+!!$  !Ignore this, useful only for bug tests
+!!$  CALL RNG_set(0)
+!!$  DO l=1,20
+!!$  CALL random_cosmology(cosi)
 
   CALL write_cosmology(cosi)
 
@@ -143,20 +143,19 @@ PROGRAM HMcode
   WRITE(*,*) 'Done'
   WRITE(*,*)
 
-  !Ignore this, only useful for bug tests
-  !END DO
+!!$  !Ignore this, only useful for bug tests
+!!$  END DO
 
 CONTAINS
 
   FUNCTION Delta_v(z,cosm)
 
-    USE cosdef
+    !Virialised overdensity
     IMPLICIT NONE
     REAL :: Delta_v
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    !Virialised overdensity
     IF(imead==0) THEN
        Delta_v=200.
     ELSE IF(imead==1) THEN
@@ -169,13 +168,12 @@ CONTAINS
 
   FUNCTION delta_c(z,cosm)
 
-    USE cosdef
+    !Linear collapse density
     IMPLICIT NONE
     REAL :: delta_c
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    !Linear collapse density
     IF(imead==0) THEN
        delta_c=1.686
     ELSE IF(imead==1) THEN
@@ -191,7 +189,6 @@ CONTAINS
 
   FUNCTION eta(z,cosm)
 
-    USE cosdef
     IMPLICIT NONE
     REAL :: eta
     REAL, INTENT(IN) :: z
@@ -208,12 +205,11 @@ CONTAINS
 
   END FUNCTION eta
 
-  FUNCTION kstar(lut,cosm)
+  FUNCTION kstar(lut)
 
-    USE cosdef
     IMPLICIT NONE
     REAL :: kstar
-    TYPE(cosmology), INTENT(IN) :: cosm
+    !TYPE(cosmology), INTENT(IN) :: cosm
     TYPE(tables), INTENT(IN) :: lut
 
     IF(imead==0) THEN
@@ -230,7 +226,6 @@ CONTAINS
 
   FUNCTION As(cosm)
 
-    USE cosdef
     IMPLICIT NONE
     REAL :: As
     TYPE(cosmology), INTENT(IN) :: cosm
@@ -248,13 +243,13 @@ CONTAINS
 
   END FUNCTION As
 
-  FUNCTION fdamp(z,cosm)
+  FUNCTION fdamp(lut)
 
-    USE cosdef
     IMPLICIT NONE
     REAL ::fdamp
-    REAL, INTENT(IN) :: z
-    TYPE(cosmology), INTENT(IN) :: cosm
+    !REAL, INTENT(IN) :: z
+    !TYPE(cosmology), INTENT(IN) :: cosm
+    TYPE(tables), INTENT(IN) :: lut
 
     !Linear theory damping factor
     IF(imead==0) THEN
@@ -272,13 +267,11 @@ CONTAINS
 
   END FUNCTION fdamp
 
-  FUNCTION alpha(lut,cosm)
+  FUNCTION alpha(lut)
 
-    USE cosdef
     IMPLICIT NONE
     REAL :: alpha
     TYPE(tables), INTENT(IN) :: lut
-    TYPE(cosmology), INTENT(IN) :: cosm
 
     IF(imead==0) THEN
        !Set to 1 for the standard halo model addition of one- and two-halo terms
@@ -298,14 +291,12 @@ CONTAINS
 
   SUBROUTINE write_parameters(z,lut,cosm)
 
-    USE cosdef
+    !This subroutine writes out the physical parameters at some redshift 
+    !(e.g. Delta_v) rather than the model parameters
     IMPLICIT NONE
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
-    TYPE(tables), INTENT(IN) :: lut
-
-    !This subroutine writes out the physical parameters at some redshift 
-    !(e.g. Delta_v) rather than the model parameters
+    TYPE(tables), INTENT(IN) :: lut    
 
     WRITE(*,*) 'Parameters at your redshift'
     WRITE(*,*) '==========================='
@@ -313,34 +304,34 @@ CONTAINS
     WRITE(*,fmt='(A10,F10.5)') 'Dv:', Delta_v(z,cosm)
     WRITE(*,fmt='(A10,F10.5)') 'dc:', delta_c(z,cosm)
     WRITE(*,fmt='(A10,F10.5)') 'eta:', eta(z,cosm)
-    WRITE(*,fmt='(A10,F10.5)') 'k*:', kstar(lut,cosm)
+    WRITE(*,fmt='(A10,F10.5)') 'k*:', kstar(lut)
     WRITE(*,fmt='(A10,F10.5)') 'A:', As(cosm)
-    WRITE(*,fmt='(A10,F10.5)') 'fdamp:', fdamp(z,cosm)
-    WRITE(*,fmt='(A10,F10.5)') 'alpha:', alpha(lut,cosm)
+    WRITE(*,fmt='(A10,F10.5)') 'fdamp:', fdamp(lut)
+    WRITE(*,fmt='(A10,F10.5)') 'alpha:', alpha(lut)
     WRITE(*,*)
 
   END SUBROUTINE write_parameters
 
   FUNCTION r_nl(lut)
 
-    USE cosdef
-    TYPE(tables), INTENT(IN) :: lut
-    REAL :: r_nl
-
     !Calculates k_nl as 1/R where nu(R)=1.
+    IMPLICIT NONE
+    TYPE(tables), INTENT(IN) :: lut
+    REAL :: r_nl    
 
     IF(lut%nu(1)>1.) THEN
        !This catches some very strange values
        r_nl=lut%rr(1)
     ELSE
-       r_nl=exp(find(log(1.),log(lut%nu),log(lut%rr),lut%n,3,3))
+       r_nl=exp(find(log(1.),log(lut%nu),log(lut%rr),lut%n,3,3,2))
     END IF
 
   END FUNCTION r_nl
 
   SUBROUTINE halomod(k,z,p1h,p2h,pfull,plin,lut,cosm)
 
-    USE cosdef
+    !Calls expressions for one- and two-halo terms and then combines
+    !to form the full power spectrum
     IMPLICIT NONE
     REAL, INTENT(OUT) :: p1h, p2h, pfull
     REAL, INTENT(IN) :: plin, k, z
@@ -348,8 +339,6 @@ CONTAINS
     TYPE(cosmology), INTENT(IN) :: cosm
     TYPE(tables), INTENT(IN) :: lut
 
-    !Calls expressions for one- and two-halo terms and then combines
-    !to form the full power spectrum
     IF(k==0.) THEN
        p1h=0.
        p2h=0.
@@ -358,7 +347,7 @@ CONTAINS
        p2h=p_2h(k,z,plin,lut,cosm)
     END IF
 
-    alp=alpha(lut,cosm)
+    alp=alpha(lut)
     pfull=(p2h**alp+p1h**alp)**(1./alp)
 
   END SUBROUTINE halomod
@@ -390,26 +379,28 @@ CONTAINS
 
   SUBROUTINE write_cosmology(cosm)
 
-    USE cosdef
+    !Writes the cosmological parameters to the screen
     IMPLICIT NONE
     TYPE(cosmology) :: cosm
 
-    IF(ihm==1) WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'Omega_m:', cosm%om_m
-    IF(ihm==1) WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'Omega_b:', cosm%om_b
-    IF(ihm==1) WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'Omega_c:', cosm%om_c
-    IF(ihm==1) WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'Omega_v:', cosm%om_v
-    IF(ihm==1) WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'h:', cosm%h
-    IF(ihm==1) WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'w_0:', cosm%w
-    IF(ihm==1) WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'w_a:', cosm%wa
-    IF(ihm==1) WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'sig8:', cosm%sig8
-    IF(ihm==1) WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'n:', cosm%n   
-    IF(ihm==1) WRITE(*,*)
+    IF(ihm==1) THEN
+       WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'Omega_m:', cosm%om_m
+       WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'Omega_b:', cosm%om_b
+       WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'Omega_c:', cosm%om_c
+       WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'Omega_v:', cosm%om_v
+       WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'h:', cosm%h
+       WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'w_0:', cosm%w
+       WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'w_a:', cosm%wa
+       WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'sig8:', cosm%sig8
+       WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'n:', cosm%n   
+       WRITE(*,*)
+    END IF
 
   END SUBROUTINE write_cosmology
 
   SUBROUTINE assign_cosmology(cosm)
 
-    USE cosdef
+    !Assigns the cosmological parameters - edit this to change cosmology
     IMPLICIT NONE
     TYPE(cosmology) :: cosm
 
@@ -427,7 +418,9 @@ CONTAINS
 
   SUBROUTINE initialise_cosmology(cosm)
 
-    USE cosdef
+    !Does some initialisation steps that are necessary for each cosmological model
+    !1 - Normalises the power spectrum to have correct sigma8
+    !2 - Fills look-up tables of R vs. Sigma(R)
     IMPLICIT NONE
     REAL :: sigi
     TYPE(cosmology) :: cosm
@@ -459,7 +452,8 @@ CONTAINS
 
   SUBROUTINE random_cosmology(cosm)
 
-    USE cosdef
+    !Makes a 'random' cosmological model - good for testing
+    IMPLICIT NONE
     TYPE(cosmology) :: cosm
     REAL :: om_m_min, om_m_max, om_b_min, om_b_max, n_min, n_max
     REAL :: w_min, w_max, h_min, h_max, sig8_min, sig8_max, wa_min, wa_max
@@ -506,7 +500,7 @@ CONTAINS
     !Seeds the RNG using the system clock so that it is different each time
     IMPLICIT NONE
     INTEGER :: int, timearray(3)
-    REAL :: rand
+    REAL :: rand !Needs to be defined for ifort (thanks Dipak Munshi)
     INTEGER, INTENT(IN) :: seed
 
     WRITE(*,*) 'Initialising RNG'
@@ -530,6 +524,7 @@ CONTAINS
     !Produces a uniform random number between x1 and x2
     IMPLICIT NONE
     REAL :: uniform
+    REAL :: rand !Needs to be defined for ifort (thanks Dipak Munshi)
     REAL, INTENT(IN) :: x1,x2
 
     !Rand is some inbuilt function
@@ -539,11 +534,12 @@ CONTAINS
 
   SUBROUTINE allocate_LUT(lut)
 
-    USE cosdef
+    !Allocates memory for the look-up tables
+    IMPLICIT NONE
     TYPE(tables) :: lut
     INTEGER :: n
 
-    !Allocates memory for the look-up tables
+    !The number of points in the look-up tables
     n=lut%n
 
     ALLOCATE(lut%zc(n),lut%m(n),lut%c(n),lut%rv(n))
@@ -562,27 +558,25 @@ CONTAINS
 
   SUBROUTINE deallocate_LUT(lut)
 
-    USE cosdef
+    !Deallocates memory for the look-up tables
+    IMPLICIT NONE
     TYPE(tables) :: lut
-
-    !Deallocates look-up tables
+    
     DEALLOCATE(lut%zc,lut%m,lut%c,lut%rv,lut%nu,lut%rr,lut%sigf,lut%sig)
 
   END SUBROUTINE deallocate_LUT
 
   SUBROUTINE halomod_init(z,lut,cosm)
 
-    USE cosdef
+    !Halo-model initialisation routine
+    !The computes other tables necessary for the one-halo integral
     IMPLICIT NONE
     REAL, INTENT(IN) :: z
     INTEGER :: i, n
     REAL :: Dv, dc, f, m, mmin, mmax, nu, r, sig
     TYPE(cosmology) :: cosm
     TYPE(tables) :: lut
-
-    !Halo-model initialisation routine
-    !The computes other tables necessary for the one-halo integral
-
+    
     !Find value of sigma_v
     lut%sigv=sqrt(dispint(z,cosm))
     lut%sigv100=sigma_v(100.,z,cosm)
@@ -669,7 +663,7 @@ CONTAINS
 
   PURE FUNCTION radius_m(m,cosm)
 
-    USE cosdef
+    !Finds the comoving radius that encloses mass 'M' in the homogeneous universe
     IMPLICIT NONE
     REAL :: radius_m
     REAL, INTENT(IN) :: m
@@ -682,7 +676,7 @@ CONTAINS
 
   FUNCTION neff(lut,cosm)
 
-    USE cosdef
+    !Calculates the effective spectral index at the non-linear scale
     IMPLICIT NONE
     REAL :: neff
     TYPE(cosmology) :: cosm
@@ -700,15 +694,15 @@ CONTAINS
 
   SUBROUTINE conc_bull(z,cosm,lut)
 
-    USE cosdef
+    !Calculates the Bullock et al. (2001) mass-concentration relation
+    !Note that there are two c(M) relations in that paper and this routine computes the more complex one
+    !i.e., not the one that is a simple power law in mass and z
     IMPLICIT NONE
     REAL, INTENT(IN) :: z
     TYPE(cosmology) :: cosm, cos_lcdm
     TYPE(tables) :: lut
     REAL :: A, zinf, ainf, zf, g_lcdm, g_wcdm
     INTEGER :: i
-
-    !Calculates the Bullock et al. (2001) mass-concentration relation
 
     A=As(cosm)
 
@@ -738,7 +732,7 @@ CONTAINS
        ainf=1./(1.+zinf)
 
        !Needs to use grow_int explicitly in case tabulated values are stored
-       g_lcdm=grow_int(ainf,0.001,cos_lcdm)
+       g_lcdm=grow_int(ainf,cos_lcdm)
 
        !Changed this to a power of 1.5, which produces more accurate results for extreme DE
        lut%c(i)=lut%c(i)*((g_wcdm/g_lcdm)**1.5)
@@ -751,7 +745,7 @@ CONTAINS
 
   SUBROUTINE zcoll_bull(z,cosm,lut)
 
-    USE cosdef
+    !This fills up the halo collapse redshift table as per Bullock relations     
     IMPLICIT NONE
     REAL, INTENT(IN) :: z
     TYPE(cosmology) :: cosm
@@ -759,9 +753,7 @@ CONTAINS
     REAL :: dc
     REAL :: af, zf, RHS, a, growz
     REAL, ALLOCATABLE :: af_tab(:), grow_tab(:)
-    INTEGER :: i, ntab
-
-    !This fills up the halo collapse redshift table as per Bullock relations       
+    INTEGER :: i, ntab      
 
     ntab=SIZE(cosm%growth)
     ALLOCATE(af_tab(ntab),grow_tab(ntab))
@@ -779,12 +771,12 @@ CONTAINS
        RHS=dc*grow(z,cosm)/lut%sigf(i)
 
        a=1./(1.+z)
-       growz=find(a,af_tab,grow_tab,cosm%ng,3,3)
+       growz=find(a,af_tab,grow_tab,cosm%ng,3,3,2)
 
        IF(RHS>growz) THEN
           zf=z
        ELSE
-          af=find(RHS,grow_tab,af_tab,cosm%ng,3,3)
+          af=find(RHS,grow_tab,af_tab,cosm%ng,3,3,2)
           zf=-1.+1./af
        END IF
 
@@ -798,11 +790,10 @@ CONTAINS
 
   FUNCTION mass_r(r,cosm)
 
-    USE cosdef
+    !Calculates the mass enclosed by comoving radius 'r' in the homogeneous universe
     IMPLICIT NONE
     REAL :: mass_r, r
     TYPE(cosmology) :: cosm
-    !REAL, PARAMETER :: pi=3.141592654
 
     !Relation between mean cosmological mass and radius
     mass_r=(4.*pi/3.)*cosmic_density(cosm)*(r**3.)
@@ -811,7 +802,7 @@ CONTAINS
 
   PURE FUNCTION cosmic_density(cosm)
 
-    USE cosdef
+    !Calculates the comoving cosmological mass density (independent of time obviously)
     IMPLICIT NONE
     REAL :: cosmic_density
     TYPE(cosmology), INTENT(IN) :: cosm
@@ -823,7 +814,7 @@ CONTAINS
 
   FUNCTION Tk(k,cosm)
 
-    USE cosdef
+    !Get the transfer function
     IMPLICIT NONE
     REAL :: Tk, k
     TYPE(cosmology) :: cosm
@@ -835,12 +826,10 @@ CONTAINS
 
   FUNCTION Tk_eh(yy,cosm)
 
-    ! the astonishing D.J. Eisenstein & W. Hu fitting formula (ApJ 496 605 [1998])
-    ! remember I use k/h, whereas they use pure k, om_m is cdm + baryons
-
-    USE cosdef
+    !This routine was originally written by John Peacock
+    !The astonishing D.J. Eisenstein & W. Hu fitting formula (ApJ 496 605 [1998])
+    !remember I use k/h, whereas they use pure k, om_m is cdm + baryons
     IMPLICIT NONE
-
     REAL :: Tk_eh
     REAL, INTENT(IN) :: yy
     TYPE(cosmology), INTENT(IN) :: cosm
@@ -910,14 +899,12 @@ CONTAINS
 
   FUNCTION p_lin(k,z,cosm)
 
-    USE cosdef
+    !This gives the linear power spectrum for the model in question
+    !P(k) should have been previously normalised so as to get the amplitude 'A' correct
     IMPLICIT NONE
     REAL :: p_lin
     REAL, INTENT (IN) :: k, z
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    !This gives the linear power spectrum for the model in question
-    !P(k) should have been previously normalised so as to get the amplitude 'A' correct
 
     IF(k==0.) THEN
        !If p_lin happens to be foolishly called for 0 mode (which should never happen, but might in integrals)
@@ -935,18 +922,17 @@ CONTAINS
 
   FUNCTION p_2h(k,z,plin,lut,cosm)
 
-    USE cosdef
+    !Produces the 'two-halo' power
+    IMPLICIT NONE
     REAL :: p_2h
     REAL, INTENT(IN) :: k, plin
-    REAL :: sigv, frac
     REAL, INTENT(IN) :: z
     TYPE(tables), INTENT(IN) :: lut
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    !Produces the 'two-halo' power
+    REAL :: sigv, frac
 
     sigv=lut%sigv
-    frac=fdamp(z,cosm)
+    frac=fdamp(lut)
 
     IF(frac==0.) THEN
        p_2h=plin
@@ -961,19 +947,15 @@ CONTAINS
 
   FUNCTION p_1h(k,z,lut,cosm)
 
-    USE cosdef
+    !Does the one-halo power integral
     IMPLICIT NONE
     REAL :: p_1h
     REAL, INTENT(IN) :: k, z
     TYPE(tables), INTENT(IN) :: lut
     TYPE(cosmology), INTENT(IN) :: cosm
-    REAL :: Dv, g, fac, et, ks, wk
+    REAL :: g, fac, et, ks, wk
     REAL, ALLOCATABLE :: integrand(:)
-    REAL :: sum
-    INTEGER :: i
-    !REAL, PARAMETER :: pi=3.141592654
-
-    !Does the one-halo power integral
+    INTEGER :: i    
 
     ALLOCATE(integrand(lut%n))
     integrand=0.
@@ -985,35 +967,26 @@ CONTAINS
     DO i=1,lut%n
        g=gnu(lut%nu(i))
        wk=win(k*(lut%nu(i)**et),lut%rv(i),lut%c(i))
-       integrand(i)=(lut%rv(i)**3.)*g*(wk**2.)
+       integrand(i)=lut%m(i)*g*(wk**2.)
     END DO
 
     !Carries out the integration
     !Important to use basic trapezium rule because the integrand is messy
-    sum=inttab(lut%nu,REAL(integrand),lut%n,1)
+    p_1h=inttab(lut%nu,REAL(integrand),lut%n,1)*(4.*pi)*(k**3.)/(cosmic_density(cosm)*(2.*pi)**3.)    
 
     DEALLOCATE(integrand)
 
-    Dv=Delta_v(z,cosm)
-
-    !These are just numerical factors from the 1-halo integral in terms of nu!
-    p_1h=sum*2.*Dv*(k**3.)/(3.*pi)
-
     !Damping of the 1-halo term at very large scales
-    ks=kstar(lut,cosm)
+    ks=kstar(lut)
 
     !Prevents problems if k/ks is very large
-
     IF(ks>0.) THEN
-
        IF((k/ks)**2.>7.) THEN
           fac=0.
        ELSE
           fac=exp(-((k/ks)**2.))
        END IF
-
        p_1h=p_1h*(1.-fac)
-
     END IF
 
   END FUNCTION p_1h
@@ -1022,8 +995,7 @@ CONTAINS
 
     !This fills up tables of r vs. sigma(r) across a range in r!
     !It is used only in look-up for further calculations of sigma(r) and not otherwise!
-    !and prevents a large number of calls to the sigint functions
-    USE cosdef
+    !and prevents a large number of calls to the sigint functions    
     IMPLICIT NONE
     REAL :: rmin, rmax
     REAL, ALLOCATABLE :: rtab(:), sigtab(:)
@@ -1077,60 +1049,75 @@ CONTAINS
 
   END SUBROUTINE fill_sigtab
 
-  FUNCTION sigma(r,z,cosm)
-
-    USE cosdef
-    IMPLICIT NONE
-    REAL :: sigma
-    REAL, INTENT(IN) :: r, z
-    TYPE(cosmology), INTENT(IN) :: cosm
-
-    IF(r>=1.e-2) THEN
-       sigma=sigint0(r,z,cosm)
-    ELSE IF(r<1.e-2) THEN
-       sigma=sqrt(sigint1(r,z,cosm)+sigint2(r,z,cosm))
-    ELSE
-       STOP 'SIGMA: Error, something went wrong'
-    END IF
-
-  END FUNCTION sigma
-
   FUNCTION sigma_v(R,z,cosm)
 
-    USE cosdef
     IMPLICIT NONE
     REAL :: sigma_v
     REAL, INTENT(IN) :: z, R
-    REAL*8 :: sum, oldsum
-    REAL :: alpha
-    REAL :: dtheta, k, theta, acc
-    !REAL, PARAMETER :: pi=3.141592654
-    INTEGER :: i, j, n, ninit, jmax
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    acc=0.001
-    ninit=100
-    jmax=30
-
-    alpha=1.65
+    REAL*8 :: sum, oldsum
+    REAL :: weight
+    REAL :: dtheta, k, theta
+    INTEGER :: i, j, n
+    REAL, PARAMETER :: acc=1e-3 !Accuracy of integration
+    INTEGER, PARAMETER :: ninit=8 !Initial number of points
+    INTEGER, PARAMETER :: jmax=30 !Maximum number of attempts
+    REAL, PARAMETER :: alpha=1.65 !Speeds up integral
+    INTEGER, PARAMETER :: iorder=3 !Set integration order
 
     DO j=1,jmax
 
+       !Number of integration points for each iteration
        n=ninit*(2**(j-1))
 
-       sum=0.d0
-       dtheta=1./float(n)
+       !Set the integration sum variable to zero
+       sum=0.d0      
 
+       !Note that contribution from end points is zero
        DO i=2,n-1
 
+          !Get the weights
+          IF(iorder==1) THEN
+             !Composite trapezium weights
+             IF(i==1 .OR. i==n) THEN
+                weight=0.5d0
+             ELSE
+                weight=1.d0
+             END IF
+          ELSE IF(iorder==2) THEN
+             !Composite extended formula weights
+             IF(i==1 .OR. i==n) THEN
+                weight=0.416666666666d0
+             ELSE IF(i==2 .OR. i==n-1) THEN
+                weight=1.083333333333d0
+             ELSE
+                weight=1.d0
+             END IF
+          ELSE IF(iorder==3) THEN
+             !Composite Simpson weights
+             IF(i==1 .OR. i==n) THEN
+                weight=0.375d0
+             ELSE IF(i==2 .OR. i==n-1) THEN
+                weight=1.166666666666
+             ELSE IF(i==3 .OR. i==n-2) THEN
+                weight=0.958333333333
+             ELSE
+                weight=1.d0
+             END IF
+          ELSE
+             STOP 'SIGMA_V: Error, order specified incorrectly'
+          END IF
+          
           !theta converts integral to 0->1 range
           !Values at the end points are 0 so removed for convenience
-          theta=float(i-1)/float(n-1)
+          theta=REAL(i-1)/REAL(n-1)
           k=(-1.+1./theta)/r**alpha
-          sum=sum+p_lin(k,z,cosm)*(wk_tophat(k*r)**2.)/((k**2.)*theta*(1.-theta))
+          sum=sum+weight*p_lin(k,z,cosm)*(wk_tophat(k*r)**2.)/((k**2.)*theta*(1.-theta))
 
        END DO
 
+       !Calculate the integration dx and multiply through
+       dtheta=1./REAL(n-1)
        sum=sum*dtheta
 
        IF(j>1 .AND. ABS(-1.+sum/oldsum)<acc) THEN
@@ -1149,26 +1136,25 @@ CONTAINS
 
   FUNCTION sigma_cb(r,z,cosm)
 
-    USE cosdef
+    !Finds sigma_cold from look-up tables
+    !In this version of HMcode sigma_cold=sigma
+    !This is no longer true if massive neutrinos are considered
+    IMPLICIT NONE
     REAL :: sigma_cb
     REAL, INTENT(IN) :: r, z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    !Finds sigma_cold from look-up tables
-    !In this version sigma_cold=sigma
-
-    sigma_cb=grow(z,cosm)*exp(find(log(r),log(cosm%r_sigma),log(cosm%sigma),cosm%nsig,3,3))
+    sigma_cb=grow(z,cosm)*exp(find(log(r),log(cosm%r_sigma),log(cosm%sigma),cosm%nsig,3,3,2))
 
   END FUNCTION sigma_cb
 
   FUNCTION wk_tophat(x)
 
+    !The normlaised Fourier Transform of a top-hat
+    !Taylor expansion used for low |x| to avoid cancellation problems
     IMPLICIT NONE
     REAL :: wk_tophat
     REAL, INTENT(IN) :: x
-
-    !The normlaised Fourier Transform of a top-hat
-    !Taylor expansion used for low |x| to avoid cancellation problems
 
     IF(x<0.01) THEN
        wk_tophat=1.-(x**2.)/10.
@@ -1301,7 +1287,8 @@ CONTAINS
 
   FUNCTION sigma_integrand(t,R,f,z,cosm)
 
-    USE cosdef
+    !The integrand for the sigma(R) integrals
+    IMPLICIT NONE
     REAL :: sigma_integrand
     REAL, INTENT(IN) :: t, R, z
     REAL :: k, y, w_hat
@@ -1333,13 +1320,12 @@ CONTAINS
 
   FUNCTION f_rapid(r)
 
+    !This is the 'rapidising' function to increase integration speed
+    !for sigma(R). Found by trial-and-error
     IMPLICIT NONE
     REAL :: f_rapid
     REAL, INTENT(IN) :: r
-    REAL :: alpha
-
-    !This is the 'rapidising' function to increase integration speed
-    !for sigma(R). Found by trial-and-error
+    REAL :: alpha   
 
     IF(r>1.e-2) THEN
        !alpha 0.3-0.5 works well
@@ -1354,27 +1340,44 @@ CONTAINS
 
   END FUNCTION f_rapid
 
-  FUNCTION sigint0(r,z,cosm)
+  FUNCTION sigma(r,z,cosm)
+
+    !USE cosdef
+    IMPLICIT NONE
+    REAL :: sigma
+    REAL, INTENT(IN) :: r, z
+    TYPE(cosmology), INTENT(IN) :: cosm
+    REAL, PARAMETER :: acc=1d-3
+    INTEGER, PARAMETER :: iorder=3
+
+    IF(r>=1.e-2) THEN
+       sigma=sigint0(r,z,cosm,acc,iorder)
+    ELSE IF(r<1.e-2) THEN
+       sigma=sqrt(sigint1(r,z,cosm,acc,iorder)+sigint2(r,z,cosm,acc,iorder))
+    ELSE
+       STOP 'SIGMA: Error, something went wrong'
+    END IF
+
+  END FUNCTION sigma
+
+  FUNCTION sigint0(r,z,cosm,acc,iorder)
 
     !Integrates between a and b until desired accuracy is reached!
-
-    USE cosdef
+    !USE cosdef
     IMPLICIT NONE
+    REAL :: sigint0
     REAL, INTENT(IN) :: r, z
-    INTEGER :: i, j, jmax
-    REAL :: sigint0, acc, dx
-    INTEGER :: ninit, n
-    REAL :: x
-    REAL*8 :: sum1, sum2
+    REAL, INTENT(IN) :: acc
+    INTEGER, INTENT(IN) :: iorder
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    acc=0.001
+    INTEGER :: i, j, n
+    REAL :: x, dx, weight
+    REAL*8 :: sum1, sum2
+    INTEGER, PARAMETER :: ninit=8 !Initial number of points
+    INTEGER, PARAMETER :: jmax=30 !Maximum number of attempts  
 
     sum1=0.d0
     sum2=0.d0
-
-    ninit=50
-    jmax=20
 
     DO j=1,jmax
 
@@ -1383,14 +1386,46 @@ CONTAINS
        !Avoids the end-points where the integrand is 0 anyway
        DO i=2,n-1
 
+          !Get the weights
+          IF(iorder==1) THEN
+             !Composite trapezium weights
+             IF(i==1 .OR. i==n) THEN
+                weight=0.5d0
+             ELSE
+                weight=1.d0
+             END IF
+          ELSE IF(iorder==2) THEN
+             !Composite extended formula weights
+             IF(i==1 .OR. i==n) THEN
+                weight=0.416666666666d0
+             ELSE IF(i==2 .OR. i==n-1) THEN
+                weight=1.083333333333d0
+             ELSE
+                weight=1.d0
+             END IF
+          ELSE IF(iorder==3) THEN
+             !Composite Simpson weights
+             IF(i==1 .OR. i==n) THEN
+                weight=0.375d0
+             ELSE IF(i==2 .OR. i==n-1) THEN
+                weight=1.166666666666
+             ELSE IF(i==3 .OR. i==n-2) THEN
+                weight=0.958333333333
+             ELSE
+                weight=1.d0
+             END IF
+          ELSE
+             STOP 'SIGINT0: Error, order specified incorrectly'
+          END IF
+
           !x is defined on the interval 0 -> 1
           x=float(i-1)/float(n-1)
 
-          sum2=sum2+sigma_integrand(x,r,f_rapid,z,cosm)
+          sum2=sum2+weight*sigma_integrand(x,r,f_rapid,z,cosm)
 
        END DO
 
-       dx=1./float(n-1)
+       dx=1.d0/REAL(n-1)
        sum2=sum2*dx
        sum2=sqrt(sum2)
 
@@ -1412,27 +1447,24 @@ CONTAINS
 
   END FUNCTION sigint0
 
-  FUNCTION sigint1(r,z,cosm)
+  FUNCTION sigint1(r,z,cosm,acc,iorder)
 
     !Integrates between a and b until desired accuracy is reached!
-
-    USE cosdef
+    !USE cosdef
     IMPLICIT NONE
+    REAL :: sigint1
     REAL, INTENT(IN) :: r, z
-    INTEGER :: i, j, jmax
-    REAL :: sigint1, acc, dx
-    INTEGER :: ninit, n
-    REAL :: x, fac, xmin, xmax, k
-    REAL*8 :: sum1, sum2
+    REAL, INTENT(IN) :: acc
+    INTEGER, INTENT(IN) :: iorder
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    acc=0.001
+    INTEGER :: i, j, n
+    REAL :: x, dx, weight, xmin, xmax, k
+    REAL*8 :: sum1, sum2  
+    INTEGER, PARAMETER :: ninit=8 !Initial number of points
+    INTEGER, PARAMETER :: jmax=30 !Maximum number of attempts  
 
     sum1=0.d0
     sum2=0.d0
-
-    ninit=50
-    jmax=20
 
     xmin=r/(r+r**.5)
     xmax=1.
@@ -1446,22 +1478,48 @@ CONTAINS
 
           x=xmin+(xmax-xmin)*float(i-1)/float(n-1)
 
-          IF(i==1 .OR. i==n) THEN
-             fac=0.5
+          !Get the weights
+          IF(iorder==1) THEN
+             !Composite trapezium weights
+             IF(i==1 .OR. i==n) THEN
+                weight=0.5d0
+             ELSE
+                weight=1.d0
+             END IF
+          ELSE IF(iorder==2) THEN
+             !Composite extended formula weights
+             IF(i==1 .OR. i==n) THEN
+                weight=0.416666666666d0
+             ELSE IF(i==2 .OR. i==n-1) THEN
+                weight=1.083333333333d0
+             ELSE
+                weight=1.d0
+             END IF
+          ELSE IF(iorder==3) THEN
+             !Composite Simpson weights
+             IF(i==1 .OR. i==n) THEN
+                weight=0.375d0
+             ELSE IF(i==2 .OR. i==n-1) THEN
+                weight=1.166666666666
+             ELSE IF(i==3 .OR. i==n-2) THEN
+                weight=0.958333333333
+             ELSE
+                weight=1.d0
+             END IF
           ELSE
-             fac=1.
+             STOP 'WININT_NORMAL: Error, order specified incorrectly'
           END IF
 
           k=(-1.+1./x)/r**.5
-          sum2=sum2+fac*p_lin(k,z,cosm)*(wk_tophat(k*r)**2.)/(x*(1.-x))
+          sum2=sum2+weight*p_lin(k,z,cosm)*(wk_tophat(k*r)**2.)/(x*(1.-x))
 
        END DO
 
-       dx=(xmax-xmin)/float(n-1)
+       dx=(xmax-xmin)/REAL(n-1)
        sum2=sum2*dx
 
        IF(j .NE. 1 .AND. ABS(-1.+sum2/sum1)<acc) THEN
-          sigint1=real(sum2)
+          sigint1=REAL(sum2)
           EXIT
        ELSE IF(j==jmax) THEN
           WRITE(*,*)
@@ -1478,27 +1536,24 @@ CONTAINS
 
   END FUNCTION sigint1
 
-  FUNCTION sigint2(r,z,cosm)
+  FUNCTION sigint2(r,z,cosm,acc,iorder)
 
     !Integrates between a and b until desired accuracy is reached!
-
-    USE cosdef
+    !USE cosdef
     IMPLICIT NONE
+    REAL :: sigint2
     REAL, INTENT(IN) :: r, z
-    INTEGER :: i, j, jmax
-    REAL :: sigint2, acc, dx
-    INTEGER :: ninit, n
-    REAL :: x, fac, xmin, xmax, A
-    REAL*8 :: sum1, sum2
+    REAL, INTENT(IN) :: acc
+    INTEGER, INTENT(IN) :: iorder
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    acc=0.001
+    INTEGER :: i, j, n
+    REAL :: x, dx, weight, xmin, xmax, A
+    REAL*8 :: sum1, sum2
+    INTEGER, PARAMETER :: ninit=8 !Initial number of points
+    INTEGER, PARAMETER :: jmax=30 !Maximum number of attempts  
 
     sum1=0.d0
     sum2=0.d0
-
-    ninit=50
-    jmax=20
 
     !How far to go out in 1/r units for integral
     A=10.
@@ -1514,22 +1569,48 @@ CONTAINS
 
           x=xmin+(xmax-xmin)*float(i-1)/float(n-1)
 
-          IF(i==1 .OR. i==n) THEN
-             fac=0.5
+          !Get the weights
+          IF(iorder==1) THEN
+             !Composite trapezium weights
+             IF(i==1 .OR. i==n) THEN
+                weight=0.5d0
+             ELSE
+                weight=1.d0
+             END IF
+          ELSE IF(iorder==2) THEN
+             !Composite extended formula weights
+             IF(i==1 .OR. i==n) THEN
+                weight=0.416666666666d0
+             ELSE IF(i==2 .OR. i==n-1) THEN
+                weight=1.083333333333d0
+             ELSE
+                weight=1.d0
+             END IF
+          ELSE IF(iorder==3) THEN
+             !Composite Simpson weights
+             IF(i==1 .OR. i==n) THEN
+                weight=0.375d0
+             ELSE IF(i==2 .OR. i==n-1) THEN
+                weight=1.166666666666
+             ELSE IF(i==3 .OR. i==n-2) THEN
+                weight=0.958333333333
+             ELSE
+                weight=1.d0
+             END IF
           ELSE
-             fac=1.
+             STOP 'WININT_NORMAL: Error, order specified incorrectly'
           END IF
 
           !Integrate linearly in k for the rapidly oscillating part
-          sum2=sum2+fac*p_lin(x,z,cosm)*(wk_tophat(x*r)**2.)/x
+          sum2=sum2+weight*p_lin(x,z,cosm)*(wk_tophat(x*r)**2.)/x
 
        END DO
 
-       dx=(xmax-xmin)/float(n-1)
+       dx=(xmax-xmin)/REAL(n-1)
        sum2=sum2*dx
 
        IF(j .NE. 1 .AND. ABS(-1.+sum2/sum1)<acc) THEN
-          sigint2=real(sum2)
+          sigint2=REAL(sum2)
           EXIT
        ELSE IF(j==jmax) THEN
           WRITE(*,*)
@@ -1548,8 +1629,11 @@ CONTAINS
 
   FUNCTION win(k,rv,c)
 
+    !Calculates the Fourier Transform of the halo density profile
+    !Normalised such that W(k=0)=1
     IMPLICIT NONE
-    REAL :: win, k, rv, c
+    REAL :: win
+    REAL, INTENT(IN) :: k, rv, c
 
     !Calls the analytic Fourier Transform of the NFW profile
     win=winnfw(k,rv,c)
@@ -1562,13 +1646,12 @@ CONTAINS
 
   FUNCTION winnfw(k,rv,c)
 
+    !The magical analytic Fourier Transform of the NFW profile
     IMPLICIT NONE
     REAL :: winnfw
     REAL, INTENT(IN) :: k, rv, c
     REAL :: si1, si2, ci1, ci2, ks
     REAL :: p1, p2, p3
-
-    !The analytic Fourier Transform of the NFW
 
     ks=k*rv/c
 
@@ -1589,10 +1672,10 @@ CONTAINS
   FUNCTION mass(c)
 
     !This calculates the (normalised) mass of a halo of concentration c
-    !This is mass with some factors missing
-
+    !This is mass with some factors missing (4*pi, rs, ...)
     IMPLICIT NONE
-    REAL :: mass, c
+    REAL :: mass
+    REAL, INTENT(IN) :: c
 
     mass=log(1.+c)-c/(1.+c)
 
@@ -1600,10 +1683,9 @@ CONTAINS
 
   FUNCTION gnu(nu)
 
+    !Mass function
     IMPLICIT NONE
     REAL :: gnu, nu
-
-    !Mass function
 
     gnu=gst(nu)
 
@@ -1613,8 +1695,7 @@ CONTAINS
 
     !Sheth Tormen mass function!
     !Note I use nu=dc/sigma(M) and this Sheth & Tormen (1999) use nu=(dc/sigma)^2
-    !This accounts for some small differences
-
+    !This accounts for small differences in the equations
     IMPLICIT NONE
     REAL :: nu, gst
     REAL :: p, q
@@ -1628,14 +1709,13 @@ CONTAINS
 
   FUNCTION hubble2(z,cosm)
 
-    USE cosdef
+    !Calculates Hubble^2 in units such that H^2(z=0)=1.
     IMPLICIT NONE
     REAL :: hubble2
     REAL, INTENT(IN) :: z
     REAL :: om_m, om_v, a
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    !Calculates Hubble^2 in units such that H^2(z=0)=1.
+    
     om_m=cosm%om_m
     om_v=cosm%om_v
     a=1./(1.+z)
@@ -1645,14 +1725,13 @@ CONTAINS
 
   FUNCTION omega_m(z,cosm)
 
-    USE cosdef
+    !This calculates Omega_m variations with z!
     IMPLICIT NONE
     REAL :: omega_m
     REAL, INTENT(IN) :: z
     REAL :: om_m
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    !This calculates Omega_m variations with z!
+    
     om_m=cosm%om_m
     omega_m=(om_m*(1.+z)**3.)/hubble2(z,cosm)
 
@@ -1660,39 +1739,40 @@ CONTAINS
 
   FUNCTION grow(z,cosm)
 
-    USE cosdef
+    !Scale-independent growth function at z=0
     IMPLICIT NONE
     REAL :: grow
     REAL, INTENT(IN) :: z
     REAL :: a
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    !Scale-independent growth function at z=0
+    
     IF(z==0.) THEN
        grow=1.
     ELSE
        a=1./(1.+z)
-       grow=find(a,cosm%a_growth,cosm%growth,cosm%ng,3,3)
+       grow=find(a,cosm%a_growth,cosm%growth,cosm%ng,3,3,2)
     END IF
 
   END FUNCTION grow
 
-  FUNCTION grow_int(b,acc,cosm)
+  FUNCTION grow_int(b,cosm)
 
-    !Integrates between a and b with nint points until desired accuracy is reached!
-    USE cosdef
+    !Integrates between a and b with nint points until desired accuracy is reached!    
     IMPLICIT NONE
-    INTEGER :: i, j, jmax
-    REAL :: grow_int, a, b, acc, dx
-    INTEGER :: nint
-    REAL :: x, fac, func, gam
+    REAL :: grow_int
+    REAL, INTENT(IN) :: b
+    TYPE(cosmology), INTENT(IN) :: cosm
+    INTEGER :: i, j, n
+    REAL :: a, dx
+    REAL :: x, weight, func, gam
     REAL*8 :: sum1, sum2
-    TYPE(cosmology) :: cosm
-
+    INTEGER, PARAMETER :: jmax=20
+    INTEGER, PARAMETER :: ninit=8
+    INTEGER, PARAMETER :: iorder=3
+    REAL, PARAMETER :: acc=1e-3
+    
     sum1=0.d0
     sum2=0.d0
-
-    jmax=20
 
     a=1.
 
@@ -1706,17 +1786,49 @@ CONTAINS
 
        DO j=1,jmax
 
-          nint=10*(2**j)
+          n=ninit*(2**(j-1))
 
-          DO i=1,nint
+          DO i=1,n
 
-             x=a+(b-a)*((float(i)-1)/(float(nint)-1))
+             x=a+(b-a)*REAL(i-1)/REAL(n-1)
 
-             IF(i==1 .OR. i==nint) THEN
-                !multiple of 1 for beginning and end and multiple of 2 for middle points!
-                fac=1.
+             !IF(i==1 .OR. i==n) THEN
+             !   !multiple of 1 for beginning and end and multiple of 2 for middle points!
+             !   weight=0.5
+             !ELSE
+             !   weight=1.
+             !END IF
+
+             !Get the weights
+             IF(iorder==1) THEN
+                !Composite trapezium weights
+                IF(i==1 .OR. i==n) THEN
+                   weight=0.5d0
+                ELSE
+                   weight=1.d0
+                END IF
+             ELSE IF(iorder==2) THEN
+                !Composite extended formula weights
+                IF(i==1 .OR. i==n) THEN
+                   weight=0.416666666666d0
+                ELSE IF(i==2 .OR. i==n-1) THEN
+                   weight=1.083333333333d0
+                ELSE
+                   weight=1.d0
+                END IF
+             ELSE IF(iorder==3) THEN
+                !Composite Simpson weights
+                IF(i==1 .OR. i==n) THEN
+                   weight=0.375d0
+                ELSE IF(i==2 .OR. i==n-1) THEN
+                   weight=1.166666666666
+                ELSE IF(i==3 .OR. i==n-2) THEN
+                   weight=0.958333333333
+                ELSE
+                   weight=1.d0
+                END IF
              ELSE
-                fac=2.
+                STOP 'SIGMA_V: Error, order specified incorrectly'
              END IF
 
              !Insert function here!
@@ -1730,12 +1842,12 @@ CONTAINS
 
              func=(omega_m(-1.+1./x,cosm)**gam)/x
 
-             sum2=sum2+fac*func
+             sum2=sum2+weight*func
 
           END DO
 
-          dx=((b-a)/(float(nint)-1.))
-          sum2=sum2*dx/2.
+          dx=(b-a)/REAL(n-1)
+          sum2=sum2*dx
 
           IF(j .NE. 1 .AND. ABS(-1.+sum2/sum1)<acc) THEN
              grow_int=real(exp(sum2))
@@ -1755,37 +1867,68 @@ CONTAINS
 
   FUNCTION dispint(z,cosm)
 
-    USE cosdef
+    !Calcualtes the total variance in the displacement field (finite for CDM spectra)
     IMPLICIT NONE
     REAL :: dispint
     REAL, INTENT(IN) :: z
     REAL*8 :: sum, oldsum
-    REAL :: dtheta, k, theta, acc
-    !REAL, PARAMETER :: pi=3.141592654
-    INTEGER :: i, j, n, ninit, jmax
+    REAL :: dtheta, k, theta, weight
+    INTEGER :: i, j, n
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    acc=0.001
-    ninit=100
-    jmax=30
+    INTEGER, PARAMETER :: jmax=30
+    INTEGER, PARAMETER :: ninit=8
+    REAL, PARAMETER :: acc=1e-3
+    INTEGER, PARAMETER :: iorder=3
 
     DO j=1,jmax
 
        n=ninit*(2**(j-1))
 
-       sum=0.d0
-       dtheta=1./float(n)
+       sum=0.d0     
 
        DO i=2,n-1
 
+          !Get the weights
+             IF(iorder==1) THEN
+                !Composite trapezium weights
+                IF(i==1 .OR. i==n) THEN
+                   weight=0.5d0
+                ELSE
+                   weight=1.d0
+                END IF
+             ELSE IF(iorder==2) THEN
+                !Composite extended formula weights
+                IF(i==1 .OR. i==n) THEN
+                   weight=0.416666666666d0
+                ELSE IF(i==2 .OR. i==n-1) THEN
+                   weight=1.083333333333d0
+                ELSE
+                   weight=1.d0
+                END IF
+             ELSE IF(iorder==3) THEN
+                !Composite Simpson weights
+                IF(i==1 .OR. i==n) THEN
+                   weight=0.375d0
+                ELSE IF(i==2 .OR. i==n-1) THEN
+                   weight=1.166666666666
+                ELSE IF(i==3 .OR. i==n-2) THEN
+                   weight=0.958333333333
+                ELSE
+                   weight=1.d0
+                END IF
+             ELSE
+                STOP 'DISPINT: Error, order specified incorrectly'
+             END IF
+
           !theta converts integral to 0->1 range
           !Values at the end points are 0 so removed for convenience
-          theta=float(i-1)/float(n-1)
+          theta=REAL(i-1)/REAL(n-1)
           k=(-1.+1./theta)          
-          sum=sum+((1.+k)**2.)*p_lin(k,z,cosm)/(k**3.)!((k**3.)*theta**2.)
+          sum=sum+((1.+k)**2)*p_lin(k,z,cosm)/(k**3)!((k**3.)*theta**2.)
 
        END DO
 
+       dtheta=1./REAL(n-1)
        sum=sum*dtheta
 
        IF(j>1 .AND. ABS(-1.+sum/oldsum)<acc) THEN  
@@ -1803,13 +1946,13 @@ CONTAINS
 
   FUNCTION Si(x)
 
+    !Sine integral function
+    !Expansions for high and low x thieved from Wikipedia, two different expansions for above and below 4.
     IMPLICIT NONE
     REAL :: Si
     REAL, INTENT(IN) :: x
     REAL*8 :: x2, y, f, g, si8
     REAL*8, PARAMETER :: pi8=3.1415926535897932384626433d0
-
-    !Expansions for high and low x thieved from Wikipedia, two different expansions for above and below 4.
 
     IF(ABS(x)<=4.) THEN
 
@@ -1859,13 +2002,13 @@ CONTAINS
 
   FUNCTION Ci(x)
 
+    !Cosine integral function
+    !Expansions for high and low x thieved from Wikipedia, two different expansions for above and below 4.
     IMPLICIT NONE
     REAL :: Ci
     REAL, INTENT(IN) :: x
     REAL*8 :: x2, y, f, g, ci8
-    REAL*8, PARAMETER :: em_const=0.577215664901532861d0
-
-    !Expansions for high and low x thieved from Wikipedia, two different expansions for above and below 4.
+    REAL*8, PARAMETER :: em_const=0.577215664901532861d0    
 
     IF(ABS(x)<=4.) THEN
 
@@ -1979,9 +2122,6 @@ CONTAINS
        ELSE
 
           i=table_integer(x,xtab,n,imeth)
-          !IF(imeth==1) i=search_int(x,xtab)
-          !IF(imeth==2) i=linear_table_integer(x,xtab)
-          !IF(imeth==3) i=int_split(x,xtab)
 
           x2=xtab(i+1)
           x1=xtab(i)
@@ -2029,10 +2169,7 @@ CONTAINS
        ELSE
 
           i=table_integer(x,xtab,n,imeth)
-          !IF(imeth==1) i=search_int(x,xtab)
-          !IF(imeth==2) i=linear_table_integer(x,xtab)
-          !IF(imeth==3) i=int_split(x,xtab)
-
+          
           x1=xtab(i-1)
           x2=xtab(i)
           x3=xtab(i+1)
@@ -2086,9 +2223,6 @@ CONTAINS
        ELSE
 
           i=table_integer(x,xtab,n,imeth)
-          !IF(imeth==1) i=search_int(x,xtab)
-          !IF(imeth==2) i=linear_table_integer(x,xtab)
-          !IF(imeth==3) i=int_split(x,xtab)
 
           x1=xtab(i-1)
           x2=xtab(i)
@@ -2113,7 +2247,7 @@ CONTAINS
 
   END FUNCTION derivative_table
 
-  FUNCTION find(x,xin,yin,n,iorder,imeth)
+  FUNCTION find(x,xin,yin,n,iorder,ifind,imeth)
 
     !Given two arrays x and y this routine interpolates to find the y_i value at position x_i
     IMPLICIT NONE
@@ -2125,7 +2259,7 @@ CONTAINS
     REAL :: x1, x2, x3, x4
     REAL :: y1, y2, y3, y4
     INTEGER :: i
-    INTEGER, INTENT(IN) :: imeth, iorder
+    INTEGER, INTENT(IN) :: imeth, iorder, ifind
 
     !This version interpolates if the value is off either end of the array!
     !Care should be chosen to insert x, xtab, ytab as log if this might give better!
@@ -2162,8 +2296,14 @@ CONTAINS
        y1=ytab(1)
        y2=ytab(2)
 
-       CALL fit_line(a,b,x1,y1,x2,y2)
-       find=a*x+b
+       IF(imeth==1) THEN
+          CALL fit_line(a,b,x1,y1,x2,y2)
+          find=a*x+b
+       ELSE IF(imeth==2) THEN
+          find=Lagrange_polynomial(x,1,(/x1,x2/),(/y1,y2/))
+       ELSE
+          STOP 'FIND: Error, method not specified correctly'
+       END IF
 
     ELSE IF(x>xtab(n)) THEN
 
@@ -2175,8 +2315,14 @@ CONTAINS
        y1=ytab(n-1)
        y2=ytab(n)
 
-       CALL fit_line(a,b,x1,y1,x2,y2)
-       find=a*x+b
+       IF(imeth==1) THEN
+          CALL fit_line(a,b,x1,y1,x2,y2)
+          find=a*x+b
+       ELSE IF(imeth==2) THEN
+          find=Lagrange_polynomial(x,1,(/x1,x2/),(/y1,y2/))
+       ELSE
+          STOP 'FIND: Error, method not specified correctly'
+       END IF
 
     ELSE IF(iorder==1) THEN
 
@@ -2200,7 +2346,7 @@ CONTAINS
 
        ELSE
 
-          i=table_integer(x,xtab,n,imeth)
+          i=table_integer(x,xtab,n,ifind)
 
           x1=xtab(i)
           x2=xtab(i+1)
@@ -2210,8 +2356,14 @@ CONTAINS
 
        END IF
 
-       CALL fit_line(a,b,x1,y1,x2,y2)
-       find=a*x+b
+       IF(imeth==1) THEN
+          CALL fit_line(a,b,x1,y1,x2,y2)
+          find=a*x+b
+       ELSE IF(imeth==2) THEN
+          find=Lagrange_polynomial(x,1,(/x1,x2/),(/y1,y2/))
+       ELSE
+          STOP 'FIND: Error, method not specified correctly'
+       END IF
 
     ELSE IF(iorder==2) THEN
 
@@ -2241,13 +2393,18 @@ CONTAINS
 
           END IF
 
-          CALL fit_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
-
-          find=a*(x**2.)+b*x+c
+          IF(imeth==1) THEN
+             CALL fit_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
+             find=a*(x**2.)+b*x+c
+          ELSE IF(imeth==2) THEN
+             find=Lagrange_polynomial(x,2,(/x1,x2,x3/),(/y1,y2,y3/))
+          ELSE
+             STOP 'FIND: Error, method not specified correctly'
+          END IF
 
        ELSE
 
-          i=table_integer(x,xtab,n,imeth)
+          i=table_integer(x,xtab,n,ifind)
 
           x1=xtab(i-1)
           x2=xtab(i)
@@ -2259,15 +2416,18 @@ CONTAINS
           y3=ytab(i+1)
           y4=ytab(i+2)
 
-          !In this case take the average of two separate quadratic spline values
-
-          find=0.
-
-          CALL fit_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
-          find=find+(a*(x**2.)+b*x+c)/2.
-
-          CALL fit_quadratic(a,b,c,x2,y2,x3,y3,x4,y4)
-          find=find+(a*(x**2.)+b*x+c)/2.
+          IF(imeth==1) THEN
+             !In this case take the average of two separate quadratic spline values
+             CALL fit_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
+             find=(a*(x**2.)+b*x+c)/2.
+             CALL fit_quadratic(a,b,c,x2,y2,x3,y3,x4,y4)
+             find=find+(a*(x**2.)+b*x+c)/2.
+          ELSE IF(imeth==2) THEN
+             !In this case take the average of two quadratic Lagrange polynomials
+             find=(Lagrange_polynomial(x,2,(/x1,x2,x3/),(/y1,y2,y3/))+Lagrange_polynomial(x,2,(/x2,x3,x4/),(/y2,y3,y4/)))/2.
+          ELSE
+             STOP 'FIND: Error, method not specified correctly'
+          END IF
 
        END IF
 
@@ -2301,7 +2461,7 @@ CONTAINS
 
        ELSE
 
-          i=table_integer(x,xtab,n,imeth)
+          i=table_integer(x,xtab,n,ifind)
 
           x1=xtab(i-1)
           x2=xtab(i)
@@ -2315,8 +2475,14 @@ CONTAINS
 
        END IF
 
-       CALL fit_cubic(a,b,c,d,x1,y1,x2,y2,x3,y3,x4,y4)
-       find=a*x**3.+b*x**2.+c*x+d
+       IF(imeth==1) THEN
+          CALL fit_cubic(a,b,c,d,x1,y1,x2,y2,x3,y3,x4,y4)
+          find=a*x**3.+b*x**2.+c*x+d
+       ELSE IF(imeth==2) THEN
+          find=Lagrange_polynomial(x,3,(/x1,x2,x3,x4/),(/y1,y2,y3,y4/))
+       ELSE
+          STOP 'FIND: Error, method not specified correctly'
+       END IF
 
     ELSE
 
@@ -2325,6 +2491,30 @@ CONTAINS
     END IF
 
   END FUNCTION find
+
+  FUNCTION Lagrange_polynomial(x,n,xv,yv)
+
+    !Computes the result of the nth order Lagrange polynomial at point x, L(x)
+    IMPLICIT NONE
+    REAL :: Lagrange_polynomial
+    REAL, INTENT(IN) :: x, xv(n+1), yv(n+1)
+    REAL :: l(n+1)
+    INTEGER, INTENT(IN) :: n
+    INTEGER :: i, j
+
+    !Initialise variables, one for sum and one for multiplication
+    Lagrange_polynomial=0.
+    l=1.
+
+    !Loops to find the polynomials, one is a sum and one is a multiple
+    DO i=0,n
+       DO j=0,n
+          IF(i .NE. j) l(i+1)=l(i+1)*(x-xv(j+1))/(xv(i+1)-xv(j+1))
+       END DO
+       Lagrange_polynomial=Lagrange_polynomial+l(i+1)*yv(i+1)
+    END DO
+
+  END FUNCTION Lagrange_polynomial
 
   FUNCTION table_integer(x,xtab,n,imeth)
 
@@ -2505,12 +2695,11 @@ CONTAINS
 
   FUNCTION file_length(file_name)
 
+    !Finds the length of a file
     IMPLICIT NONE
     CHARACTER(len=64) :: file_name
     INTEGER ::n, file_length
-    REAL :: data
-
-    !Finds the length of a file
+    REAL :: data   
 
     OPEN(7,file=file_name)
     n=0
@@ -2529,8 +2718,7 @@ CONTAINS
 
   SUBROUTINE fill_growtab(cosm)
 
-    !Fills a table of the growth function vs. a
-    USE cosdef
+    !Fills a table of the growth function vs. a   
     IMPLICIT NONE
     TYPE(cosmology) :: cosm
     INTEGER :: i
@@ -2558,7 +2746,7 @@ CONTAINS
     IF(ihm==1) WRITE(*,*) 'GROWTH: ODE done'
 
     !Normalise so that g(z=0)=1
-    norm=find(1.,a_tab,d_tab,SIZE(a_tab),3,3)
+    norm=find(1.,a_tab,d_tab,SIZE(a_tab),3,3,2)
     IF(ihm==1) WRITE(*,*) 'GROWTH: unnormalised g(a=1):', norm
     d_tab=d_tab/norm
     IF(ihm==1) WRITE(*,*)
@@ -2567,19 +2755,19 @@ CONTAINS
     !Could use some table-interpolation routine here to save time
     IF(ALLOCATED(cosm%a_growth)) DEALLOCATE(cosm%a_growth,cosm%growth)
     cosm%ng=n
-    
+
     ALLOCATE(cosm%a_growth(n),cosm%growth(n))
     DO i=1,n
        a=ainit+(amax-ainit)*float(i-1)/float(n-1)
        cosm%a_growth(i)=a
-       cosm%growth(i)=find(a,a_tab,d_tab,SIZE(a_tab),3,3)
+       cosm%growth(i)=find(a,a_tab,d_tab,SIZE(a_tab),3,3,2)
     END DO
 
   END SUBROUTINE fill_growtab
 
   SUBROUTINE ode_growth(x,v,t,kk,ti,tf,xi,vi,acc,imeth,cosm)
 
-    USE cosdef
+    !Solves 2nd order ODE x''(t) from ti to tf and writes out array of x, v, t values 
     IMPLICIT NONE
     REAL :: xi, ti, tf, dt, acc, vi, x4, v4, t4, kk
     REAL :: kx1, kx2, kx3, kx4, kv1, kv2, kv3, kv4
@@ -2588,7 +2776,6 @@ CONTAINS
     INTEGER :: i, j, k, n, np, ifail, kn, imeth
     TYPE(cosmology) :: cosm
 
-    !Solves 2nd order ODE x''(t) from ti to tf and writes out array of x, v, t values
     !xi and vi are the initial values of x and v (i.e. x(ti), v(ti))
     !fx is what x' is equal to
     !fv is what v' is equal to
@@ -2626,14 +2813,14 @@ CONTAINS
 
           IF(imeth==1) THEN
 
-             !Crude method!
+             !Crude method
              v8(i+1)=v8(i)+fv(x4,v4,kk,t4,cosm)*dt
              x8(i+1)=x8(i)+fd(x4,v4,kk,t4,cosm)*dt
              t8(i+1)=t8(i)+dt
 
           ELSE IF(imeth==2) THEN
 
-             !Mid-point method!
+             !Mid-point method
              kx1=dt*fd(x4,v4,kk,t4,cosm)
              kv1=dt*fv(x4,v4,kk,t4,cosm)
              kx2=dt*fd(x4+kx1/2.,v4+kv1/2.,kk,t4+dt/2.,cosm)
@@ -2645,7 +2832,7 @@ CONTAINS
 
           ELSE IF(imeth==3) THEN
 
-             !4th order Runge-Kutta method (fucking fast)!
+             !4th order Runge-Kutta method (fast!)
              kx1=dt*fd(x4,v4,kk,t4,cosm)
              kv1=dt*fv(x4,v4,kk,t4,cosm)
              kx2=dt*fd(x4+kx1/2.,v4+kv1/2.,kk,t4+dt/2.,cosm)
@@ -2708,15 +2895,13 @@ CONTAINS
 
   FUNCTION fv(d,v,k,a,cosm)
 
-    USE cosdef
+    !This is the fv in delta''=fv
+    !Needed for growth function solution
     IMPLICIT NONE
     REAL :: fv
     REAL, INTENT(IN) :: d, v, k, a
     REAL :: f1, f2, z
-    TYPE(cosmology), INTENT(IN) :: cosm
-
-    !Needed for growth function solution
-    !This is the fv in \ddot{\delta}=fv
+    TYPE(cosmology), INTENT(IN) :: cosm   
 
     z=-1.+(1./a)
 
@@ -2729,14 +2914,12 @@ CONTAINS
 
   FUNCTION fd(d,v,k,a,cosm)
 
-    USE cosdef
+    !This is the fd in delta'=fd
+    !Needed for growth function solution
     IMPLICIT NONE
     REAL :: fd
     REAL, INTENT(IN) :: d, v, k, a
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    !Needed for growth function solution
-    !This is the fd in \dot{\delta}=fd
 
     fd=v
 
@@ -2744,14 +2927,12 @@ CONTAINS
 
   FUNCTION AH(z,cosm)
 
-    USE cosdef
+    !Acceleration function - \ddot{a}/a
     IMPLICIT NONE
     REAL :: AH
     REAL, INTENT(IN) :: z
     REAL :: a
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    !\ddot{a}/a
 
     a=1./(1.+z)
 
@@ -2763,30 +2944,26 @@ CONTAINS
 
   FUNCTION X_de(a,cosm)
 
-    USE cosdef
+    !The time evolution for Om_w for w(a) DE models
     IMPLICIT NONE
     REAL :: X_de
     REAL, INTENT(IN) :: a
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    !The time evolution for Om_w for w(a) DE models
+    
     X_de=(a**(-3.*(1.+cosm%w+cosm%wa)))*exp(-3.*cosm%wa*(1.-a))
 
   END FUNCTION X_de
 
   FUNCTION w_de(a,cosm)
 
-    USE cosdef
+    !w(a) for DE models
     IMPLICIT NONE
     REAL :: w_de
     REAL, INTENT(IN) :: a
     TYPE(cosmology), INTENT(IN) :: cosm
-
-    !w(a) for DE models
+    
     w_de=cosm%w+(1.-a)*cosm%wa
 
   END FUNCTION w_de
 
 END PROGRAM HMcode
-
-
