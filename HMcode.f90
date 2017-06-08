@@ -25,7 +25,7 @@ PROGRAM HMcode
   REAL :: z
   REAL :: p1h, p2h, pfull, plin
   REAL, ALLOCATABLE :: k(:), ztab(:), ptab(:,:)
-  INTEGER :: i, j, l, nk, nz
+  INTEGER :: i, j, nk, nz
   INTEGER :: ihm
   REAL :: kmin, kmax, zmin, zmax
   REAL, PARAMETER :: pi=3.141592654
@@ -450,74 +450,74 @@ CONTAINS
 
   END SUBROUTINE initialise_cosmology
 
-  SUBROUTINE random_cosmology(cosm)
+!!$  SUBROUTINE random_cosmology(cosm)
+!!$
+!!$    !Makes a 'random' cosmological model - good for testing
+!!$    IMPLICIT NONE
+!!$    TYPE(cosmology) :: cosm
+!!$    REAL :: om_m_min, om_m_max, om_b_min, om_b_max, n_min, n_max
+!!$    REAL :: w_min, w_max, h_min, h_max, sig8_min, sig8_max, wa_min, wa_max
+!!$
+!!$    !Needs to be set to normalise P_lin
+!!$    cosm%A=1.
+!!$
+!!$    om_m_min=0.1
+!!$    om_m_max=1.
+!!$    cosm%om_m=uniform(om_m_min,om_m_max)
+!!$
+!!$    cosm%om_v=1.-cosm%om_m
+!!$
+!!$    om_b_min=0.005
+!!$    om_b_max=MIN(0.095,cosm%om_m)
+!!$    cosm%om_b=uniform(om_b_min,om_b_max)
+!!$
+!!$    cosm%om_c=cosm%om_m-cosm%om_b
+!!$
+!!$    n_min=0.5
+!!$    n_max=1.5
+!!$    cosm%n=uniform(n_min,n_max)
+!!$
+!!$    h_min=0.4
+!!$    h_max=1.2
+!!$    cosm%h=uniform(h_min,h_max)
+!!$
+!!$    w_min=-1.5
+!!$    w_max=-0.5
+!!$    cosm%w=uniform(w_min,w_max)
+!!$
+!!$    wa_min=-1.
+!!$    wa_max=-cosm%w*0.8
+!!$    cosm%wa=uniform(wa_min,wa_max)
+!!$
+!!$    sig8_min=0.2
+!!$    sig8_max=1.5
+!!$    cosm%sig8=uniform(sig8_min,sig8_max)
+!!$
+!!$  END SUBROUTINE random_cosmology
 
-    !Makes a 'random' cosmological model - good for testing
-    IMPLICIT NONE
-    TYPE(cosmology) :: cosm
-    REAL :: om_m_min, om_m_max, om_b_min, om_b_max, n_min, n_max
-    REAL :: w_min, w_max, h_min, h_max, sig8_min, sig8_max, wa_min, wa_max
-
-    !Needs to be set to normalise P_lin
-    cosm%A=1.
-
-    om_m_min=0.1
-    om_m_max=1.
-    cosm%om_m=uniform(om_m_min,om_m_max)
-
-    cosm%om_v=1.-cosm%om_m
-
-    om_b_min=0.005
-    om_b_max=MIN(0.095,cosm%om_m)
-    cosm%om_b=uniform(om_b_min,om_b_max)
-
-    cosm%om_c=cosm%om_m-cosm%om_b
-
-    n_min=0.5
-    n_max=1.5
-    cosm%n=uniform(n_min,n_max)
-
-    h_min=0.4
-    h_max=1.2
-    cosm%h=uniform(h_min,h_max)
-
-    w_min=-1.5
-    w_max=-0.5
-    cosm%w=uniform(w_min,w_max)
-
-    wa_min=-1.
-    wa_max=-cosm%w*0.8
-    cosm%wa=uniform(wa_min,wa_max)
-
-    sig8_min=0.2
-    sig8_max=1.5
-    cosm%sig8=uniform(sig8_min,sig8_max)
-
-  END SUBROUTINE random_cosmology
-
-  SUBROUTINE RNG_set(seed)
-
-    !Seeds the RNG using the system clock so that it is different each time
-    IMPLICIT NONE
-    INTEGER :: int, timearray(3)
-    REAL :: rand !Needs to be defined for ifort (thanks Dipak Munshi)
-    INTEGER, INTENT(IN) :: seed
-
-    WRITE(*,*) 'Initialising RNG'
-
-    IF(seed==0) THEN
-       !This fills the time array using the system clock!
-       !If called within the same second the numbers will be identical!
-       CALL itime(timeArray)
-       !This then initialises the generator!
-       int=FLOOR(rand(timeArray(1)+timeArray(2)+timeArray(3)))
-    ELSE
-       int=FLOOR(rand(seed))
-    END IF
-    WRITE(*,*) 'RNG set'
-    WRITE(*,*)
-
-  END SUBROUTINE RNG_set
+!!$  SUBROUTINE RNG_set(seed)
+!!$
+!!$    !Seeds the RNG using the system clock so that it is different each time
+!!$    IMPLICIT NONE
+!!$    INTEGER :: int, timearray(3)
+!!$    REAL :: rand !Needs to be defined for ifort (thanks Dipak Munshi)
+!!$    INTEGER, INTENT(IN) :: seed
+!!$
+!!$    WRITE(*,*) 'Initialising RNG'
+!!$
+!!$    IF(seed==0) THEN
+!!$       !This fills the time array using the system clock!
+!!$       !If called within the same second the numbers will be identical!
+!!$       CALL itime(timeArray)
+!!$       !This then initialises the generator!
+!!$       int=FLOOR(rand(timeArray(1)+timeArray(2)+timeArray(3)))
+!!$    ELSE
+!!$       int=FLOOR(rand(seed))
+!!$    END IF
+!!$    WRITE(*,*) 'RNG set'
+!!$    WRITE(*,*)
+!!$
+!!$  END SUBROUTINE RNG_set
 
   FUNCTION uniform(x1,x2)
 
@@ -578,8 +578,8 @@ CONTAINS
     TYPE(tables) :: lut
     
     !Find value of sigma_v
-    lut%sigv=sqrt(dispint(z,cosm))
-    lut%sigv100=sigma_v(100.,z,cosm)
+    lut%sigv=sqrt(dispint(0.,z,cosm)/3.)
+    lut%sigv100=sqrt(dispint(100.,z,cosm)/3.)
     lut%sig8z=sigma(8.,z,cosm)
 
     IF(ihm==1) WRITE(*,*) 'HALOMOD: Filling look-up tables'
@@ -732,7 +732,8 @@ CONTAINS
        ainf=1./(1.+zinf)
 
        !Needs to use grow_int explicitly in case tabulated values are stored
-       g_lcdm=grow_int(ainf,cos_lcdm)
+       !g_lcdm=grow_int(ainf,cos_lcdm)
+       g_lcdm=growint(ainf,cos_lcdm)
 
        !Changed this to a power of 1.5, which produces more accurate results for extreme DE
        lut%c(i)=lut%c(i)*((g_wcdm/g_lcdm)**1.5)
@@ -1049,90 +1050,90 @@ CONTAINS
 
   END SUBROUTINE fill_sigtab
 
-  FUNCTION sigma_v(R,z,cosm)
-
-    IMPLICIT NONE
-    REAL :: sigma_v
-    REAL, INTENT(IN) :: z, R
-    TYPE(cosmology), INTENT(IN) :: cosm
-    REAL*8 :: sum, oldsum
-    REAL :: weight
-    REAL :: dtheta, k, theta
-    INTEGER :: i, j, n
-    REAL, PARAMETER :: acc=1e-3 !Accuracy of integration
-    INTEGER, PARAMETER :: ninit=8 !Initial number of points
-    INTEGER, PARAMETER :: jmax=30 !Maximum number of attempts
-    REAL, PARAMETER :: alpha=1.65 !Speeds up integral
-    INTEGER, PARAMETER :: iorder=3 !Set integration order
-
-    DO j=1,jmax
-
-       !Number of integration points for each iteration
-       n=ninit*(2**(j-1))
-
-       !Set the integration sum variable to zero
-       sum=0.d0      
-
-       !Note that contribution from end points is zero
-       DO i=2,n-1
-
-          !Get the weights
-          IF(iorder==1) THEN
-             !Composite trapezium weights
-             IF(i==1 .OR. i==n) THEN
-                weight=0.5d0
-             ELSE
-                weight=1.d0
-             END IF
-          ELSE IF(iorder==2) THEN
-             !Composite extended formula weights
-             IF(i==1 .OR. i==n) THEN
-                weight=0.416666666666d0
-             ELSE IF(i==2 .OR. i==n-1) THEN
-                weight=1.083333333333d0
-             ELSE
-                weight=1.d0
-             END IF
-          ELSE IF(iorder==3) THEN
-             !Composite Simpson weights
-             IF(i==1 .OR. i==n) THEN
-                weight=0.375d0
-             ELSE IF(i==2 .OR. i==n-1) THEN
-                weight=1.166666666666
-             ELSE IF(i==3 .OR. i==n-2) THEN
-                weight=0.958333333333
-             ELSE
-                weight=1.d0
-             END IF
-          ELSE
-             STOP 'SIGMA_V: Error, order specified incorrectly'
-          END IF
-          
-          !theta converts integral to 0->1 range
-          !Values at the end points are 0 so removed for convenience
-          theta=REAL(i-1)/REAL(n-1)
-          k=(-1.+1./theta)/r**alpha
-          sum=sum+weight*p_lin(k,z,cosm)*(wk_tophat(k*r)**2.)/((k**2.)*theta*(1.-theta))
-
-       END DO
-
-       !Calculate the integration dx and multiply through
-       dtheta=1./REAL(n-1)
-       sum=sum*dtheta
-
-       IF(j>1 .AND. ABS(-1.+sum/oldsum)<acc) THEN
-          !Convert from sigma_v^2 and to 1D dispersion
-          sigma_v=real(sqrt(sum/3.d0))
-          EXIT
-       ELSE IF(j==jmax) THEN
-          STOP 'SIGMA_V: Error, integration timed out'
-       ELSE
-          oldsum=sum
-       END IF
-
-    END DO
-
-  END FUNCTION sigma_v
+!!$  FUNCTION sigma_v(R,z,cosm)
+!!$
+!!$    IMPLICIT NONE
+!!$    REAL :: sigma_v
+!!$    REAL, INTENT(IN) :: z, R
+!!$    TYPE(cosmology), INTENT(IN) :: cosm
+!!$    REAL*8 :: sum, oldsum
+!!$    REAL :: weight
+!!$    REAL :: dtheta, k, theta
+!!$    INTEGER :: i, j, n
+!!$    REAL, PARAMETER :: acc=1e-3 !Accuracy of integration
+!!$    INTEGER, PARAMETER :: ninit=8 !Initial number of points
+!!$    INTEGER, PARAMETER :: jmax=30 !Maximum number of attempts
+!!$    REAL, PARAMETER :: alpha=1.65 !Speeds up integral
+!!$    INTEGER, PARAMETER :: iorder=3 !Set integration order
+!!$
+!!$    DO j=1,jmax
+!!$
+!!$       !Number of integration points for each iteration
+!!$       n=ninit*(2**(j-1))
+!!$
+!!$       !Set the integration sum variable to zero
+!!$       sum=0.d0      
+!!$
+!!$       !Note that contribution from end points is zero
+!!$       DO i=2,n-1
+!!$
+!!$          !Get the weights
+!!$          IF(iorder==1) THEN
+!!$             !Composite trapezium weights
+!!$             IF(i==1 .OR. i==n) THEN
+!!$                weight=0.5d0
+!!$             ELSE
+!!$                weight=1.d0
+!!$             END IF
+!!$          ELSE IF(iorder==2) THEN
+!!$             !Composite extended formula weights
+!!$             IF(i==1 .OR. i==n) THEN
+!!$                weight=0.416666666666d0
+!!$             ELSE IF(i==2 .OR. i==n-1) THEN
+!!$                weight=1.083333333333d0
+!!$             ELSE
+!!$                weight=1.d0
+!!$             END IF
+!!$          ELSE IF(iorder==3) THEN
+!!$             !Composite Simpson weights
+!!$             IF(i==1 .OR. i==n) THEN
+!!$                weight=0.375d0
+!!$             ELSE IF(i==2 .OR. i==n-1) THEN
+!!$                weight=1.166666666666
+!!$             ELSE IF(i==3 .OR. i==n-2) THEN
+!!$                weight=0.958333333333
+!!$             ELSE
+!!$                weight=1.d0
+!!$             END IF
+!!$          ELSE
+!!$             STOP 'SIGMA_V: Error, order specified incorrectly'
+!!$          END IF
+!!$          
+!!$          !theta converts integral to 0->1 range
+!!$          !Values at the end points are 0 so removed for convenience
+!!$          theta=REAL(i-1)/REAL(n-1)
+!!$          k=(-1.+1./theta)/r**alpha
+!!$          sum=sum+weight*p_lin(k,z,cosm)*(wk_tophat(k*r)**2.)/((k**2.)*theta*(1.-theta))
+!!$
+!!$       END DO
+!!$
+!!$       !Calculate the integration dx and multiply through
+!!$       dtheta=1./REAL(n-1)
+!!$       sum=sum*dtheta
+!!$
+!!$       IF(j>1 .AND. ABS(-1.+sum/oldsum)<acc) THEN
+!!$          !Convert from sigma_v^2 and to 1D dispersion
+!!$          sigma_v=real(sqrt(sum/3.d0))
+!!$          EXIT
+!!$       ELSE IF(j==jmax) THEN
+!!$          STOP 'SIGMA_V: Error, integration timed out'
+!!$       ELSE
+!!$          oldsum=sum
+!!$       END IF
+!!$
+!!$    END DO
+!!$
+!!$  END FUNCTION sigma_v
 
   FUNCTION sigma_cb(r,z,cosm)
 
@@ -1285,11 +1286,52 @@ CONTAINS
 
   END FUNCTION inttab
 
-  FUNCTION sigma_integrand(t,R,f,z,cosm)
+  FUNCTION sigma(r,z,cosm)
+
+    !USE cosdef
+    IMPLICIT NONE
+    REAL :: sigma
+    REAL, INTENT(IN) :: r, z
+    TYPE(cosmology), INTENT(IN) :: cosm
+    REAL, PARAMETER :: acc=1e-4
+    INTEGER, PARAMETER :: iorder=3
+    REAL, PARAMETER :: rsplit=1e-2
+
+    IF(r>=rsplit) THEN
+       sigma=sqrt(sigint0(r,z,cosm,acc,iorder))
+    ELSE IF(r<rsplit) THEN
+       sigma=sqrt(sigint1(r,z,cosm,acc,iorder)+sigint2(r,z,cosm,acc,iorder))
+    ELSE
+       STOP 'SIGMA: Error, something went wrong'
+    END IF
+
+  END FUNCTION sigma
+
+  FUNCTION sigma_integrand(k,R,z,cosm)
 
     !The integrand for the sigma(R) integrals
     IMPLICIT NONE
     REAL :: sigma_integrand
+    REAL, INTENT(IN) :: k, R, z
+    TYPE(cosmology), INTENT(IN) :: cosm
+    REAL :: y, w_hat
+
+    IF(k==0.) THEN
+       !k=0.
+       sigma_integrand=0.
+    ELSE
+       y=k*R
+       w_hat=wk_tophat(y)
+       sigma_integrand=p_lin(k,z,cosm)*(w_hat**2)/k
+    END IF
+
+  END FUNCTION sigma_integrand
+
+  FUNCTION sigma_integrand_transformed(t,R,f,z,cosm)
+
+    !The integrand for the sigma(R) integrals
+    IMPLICIT NONE
+    REAL :: sigma_integrand_transformed
     REAL, INTENT(IN) :: t, R, z
     REAL :: k, y, w_hat
     TYPE(cosmology), INTENT(IN) :: cosm
@@ -1304,30 +1346,121 @@ CONTAINS
 
     IF(t==0.) THEN
        !t=0 corresponds to k=infintiy when W(kR)=0.
-       sigma_integrand=0.
+       sigma_integrand_transformed=0.
     ELSE IF(t==1.) THEN
        !t=1 corresponds to k=0. when P(k)=0.
-       sigma_integrand=0.
+       sigma_integrand_transformed=0.
     ELSE
        !f(R) can be *any* function of R here to improve integration speed
        k=(-1.+1./t)/f(R)
        y=k*R
        w_hat=wk_tophat(y)
-       sigma_integrand=p_lin(k,z,cosm)*(w_hat**2.)/(t*(1.-t))
+       sigma_integrand_transformed=p_lin(k,z,cosm)*(w_hat**2)/(t*(1.-t))
     END IF
 
-  END FUNCTION sigma_integrand
+  END FUNCTION sigma_integrand_transformed
 
-  FUNCTION f_rapid(r)
+  FUNCTION sigint0(r,z,cosm,acc,iorder)
+
+    !Integrates between a and b until desired accuracy is reached
+    !Stores information to reduce function calls
+    IMPLICIT NONE
+    REAL :: sigint0
+    REAL, INTENT(IN) :: r, z
+    TYPE(cosmology), INTENT(IN) :: cosm
+    REAL, INTENT(IN) :: acc
+    INTEGER, INTENT(IN) :: iorder
+    REAL :: a, b
+    INTEGER :: i, j
+    INTEGER :: n
+    REAL :: x, dx
+    REAL :: f1, f2, fx
+    REAL*8 :: sum_n, sum_2n, sum_new, sum_old
+    INTEGER, PARAMETER :: jmin=5
+    INTEGER, PARAMETER :: jmax=30
+
+    a=0.d0
+    b=1.d0
+
+    IF(a==b) THEN
+
+       !Fix the answer to zero if the integration limits are identical
+       sigint0=0.
+
+    ELSE
+
+       !Reset the sum variable for the integration
+       sum_2n=0.d0
+
+       DO j=1,jmax
+          
+          !Note, you need this to be 1+2**n for some integer n
+          !j=1 n=2; j=2 n=3; j=3 n=5; j=4 n=9; ...'
+          n=1+2**(j-1)
+
+          !Calculate the dx interval for this value of 'n'
+          dx=(b-a)/REAL(n-1)
+
+          IF(j==1) THEN
+             
+             !The first go is just the trapezium of the end points
+             f1=sigma_integrand_transformed(a,r,f0_rapid,z,cosm)
+             f2=sigma_integrand_transformed(b,r,f0_rapid,z,cosm)
+             sum_2n=0.5d0*(f1+f2)*dx
+             
+          ELSE
+
+             !Loop over only new even points to add these to the integral
+             DO i=2,n,2
+                x=a+(b-a)*REAL(i-1)/REAL(n-1)
+                fx=sigma_integrand_transformed(x,r,f0_rapid,z,cosm)
+                sum_2n=sum_2n+fx
+             END DO
+
+             !Now create the total using the old and new parts
+             sum_2n=sum_n/2.d0+sum_2n*dx
+
+             !Now calculate the new sum depending on the integration order
+             IF(iorder==1) THEN  
+                sum_new=sum_2n
+             ELSE IF(iorder==3) THEN         
+                sum_new=(4.d0*sum_2n-sum_n)/3.d0 !This is Simpson's rule and cancels error
+             ELSE
+                STOP 'SIGINT0: Error, iorder specified incorrectly'
+             END IF
+
+          END IF
+
+          IF((j>=jmin) .AND. (ABS(-1.d0+sum_new/sum_old)<acc)) THEN
+             !jmin avoids spurious early convergence
+             sigint0=REAL(sum_new)
+             EXIT
+          ELSE IF(j==jmax) THEN
+             STOP 'SIGINT0: Integration timed out'
+          ELSE
+             !Integral has not converged so store old sums and reset sum variables
+             sum_old=sum_new
+             sum_n=sum_2n
+             sum_2n=0.d0
+          END IF
+
+       END DO
+
+    END IF
+
+  END FUNCTION sigint0
+
+  FUNCTION f0_rapid(r)
 
     !This is the 'rapidising' function to increase integration speed
     !for sigma(R). Found by trial-and-error
     IMPLICIT NONE
-    REAL :: f_rapid
+    REAL :: f0_rapid
     REAL, INTENT(IN) :: r
-    REAL :: alpha   
+    REAL :: alpha
+    REAL, PARAMETER :: rsplit=1e-2
 
-    IF(r>1.e-2) THEN
+    IF(r>rsplit) THEN
        !alpha 0.3-0.5 works well
        alpha=0.5
     ELSE
@@ -1336,294 +1469,202 @@ CONTAINS
        alpha=0.8
     END IF
 
-    f_rapid=r**alpha
+    f0_rapid=r**alpha
 
-  END FUNCTION f_rapid
-
-  FUNCTION sigma(r,z,cosm)
-
-    !USE cosdef
-    IMPLICIT NONE
-    REAL :: sigma
-    REAL, INTENT(IN) :: r, z
-    TYPE(cosmology), INTENT(IN) :: cosm
-    REAL, PARAMETER :: acc=1d-3
-    INTEGER, PARAMETER :: iorder=3
-
-    IF(r>=1.e-2) THEN
-       sigma=sigint0(r,z,cosm,acc,iorder)
-    ELSE IF(r<1.e-2) THEN
-       sigma=sqrt(sigint1(r,z,cosm,acc,iorder)+sigint2(r,z,cosm,acc,iorder))
-    ELSE
-       STOP 'SIGMA: Error, something went wrong'
-    END IF
-
-  END FUNCTION sigma
-
-  FUNCTION sigint0(r,z,cosm,acc,iorder)
-
-    !Integrates between a and b until desired accuracy is reached!
-    !USE cosdef
-    IMPLICIT NONE
-    REAL :: sigint0
-    REAL, INTENT(IN) :: r, z
-    REAL, INTENT(IN) :: acc
-    INTEGER, INTENT(IN) :: iorder
-    TYPE(cosmology), INTENT(IN) :: cosm
-    INTEGER :: i, j, n
-    REAL :: x, dx, weight
-    REAL*8 :: sum1, sum2
-    INTEGER, PARAMETER :: ninit=8 !Initial number of points
-    INTEGER, PARAMETER :: jmax=30 !Maximum number of attempts  
-
-    sum1=0.d0
-    sum2=0.d0
-
-    DO j=1,jmax
-
-       n=ninit*2**(j-1)
-
-       !Avoids the end-points where the integrand is 0 anyway
-       DO i=2,n-1
-
-          !Get the weights
-          IF(iorder==1) THEN
-             !Composite trapezium weights
-             IF(i==1 .OR. i==n) THEN
-                weight=0.5d0
-             ELSE
-                weight=1.d0
-             END IF
-          ELSE IF(iorder==2) THEN
-             !Composite extended formula weights
-             IF(i==1 .OR. i==n) THEN
-                weight=0.416666666666d0
-             ELSE IF(i==2 .OR. i==n-1) THEN
-                weight=1.083333333333d0
-             ELSE
-                weight=1.d0
-             END IF
-          ELSE IF(iorder==3) THEN
-             !Composite Simpson weights
-             IF(i==1 .OR. i==n) THEN
-                weight=0.375d0
-             ELSE IF(i==2 .OR. i==n-1) THEN
-                weight=1.166666666666
-             ELSE IF(i==3 .OR. i==n-2) THEN
-                weight=0.958333333333
-             ELSE
-                weight=1.d0
-             END IF
-          ELSE
-             STOP 'SIGINT0: Error, order specified incorrectly'
-          END IF
-
-          !x is defined on the interval 0 -> 1
-          x=float(i-1)/float(n-1)
-
-          sum2=sum2+weight*sigma_integrand(x,r,f_rapid,z,cosm)
-
-       END DO
-
-       dx=1.d0/REAL(n-1)
-       sum2=sum2*dx
-       sum2=sqrt(sum2)
-
-       IF(j .NE. 1 .AND. ABS(-1.+sum2/sum1)<acc) THEN
-          sigint0=real(sum2)
-          EXIT
-       ELSE IF(j==jmax) THEN
-          WRITE(*,*)
-          WRITE(*,*) 'SIGINT: r:', r
-          WRITE(*,*) 'SIGINT: Integration timed out'
-          WRITE(*,*)
-          STOP
-       ELSE
-          sum1=sum2
-          sum2=0.d0
-       END IF
-
-    END DO
-
-  END FUNCTION sigint0
+  END FUNCTION f0_rapid
 
   FUNCTION sigint1(r,z,cosm,acc,iorder)
 
-    !Integrates between a and b until desired accuracy is reached!
-    !USE cosdef
+    !Integrates between a and b until desired accuracy is reached
+    !Stores information to reduce function calls
     IMPLICIT NONE
     REAL :: sigint1
     REAL, INTENT(IN) :: r, z
+    TYPE(cosmology), INTENT(IN) :: cosm
     REAL, INTENT(IN) :: acc
     INTEGER, INTENT(IN) :: iorder
-    TYPE(cosmology), INTENT(IN) :: cosm
-    INTEGER :: i, j, n
-    REAL :: x, dx, weight, xmin, xmax, k
-    REAL*8 :: sum1, sum2  
-    INTEGER, PARAMETER :: ninit=8 !Initial number of points
-    INTEGER, PARAMETER :: jmax=30 !Maximum number of attempts  
+    REAL :: a, b
+    INTEGER :: i, j
+    INTEGER :: n
+    REAL :: x, dx
+    REAL :: f1, f2, fx
+    REAL*8 :: sum_n, sum_2n, sum_new, sum_old
+    INTEGER, PARAMETER :: jmin=5
+    INTEGER, PARAMETER :: jmax=30
 
-    sum1=0.d0
-    sum2=0.d0
+    a=r/(r+r**.5)
+    b=1.d0
 
-    xmin=r/(r+r**.5)
-    xmax=1.
+    IF(a==b) THEN
 
-    DO j=1,jmax
+       !Fix the answer to zero if the integration limits are identical
+       sigint1=0.
 
-       n=ninit*2**(j-1)
+    ELSE
 
-       !Avoids the end-point where the integrand is 0 anyway
-       DO i=1,n-1
+       !Reset the sum variable for the integration
+       sum_2n=0.d0
 
-          x=xmin+(xmax-xmin)*float(i-1)/float(n-1)
+       DO j=1,jmax
+          
+          !Note, you need this to be 1+2**n for some integer n
+          !j=1 n=2; j=2 n=3; j=3 n=5; j=4 n=9; ...'
+          n=1+2**(j-1)
 
-          !Get the weights
-          IF(iorder==1) THEN
-             !Composite trapezium weights
-             IF(i==1 .OR. i==n) THEN
-                weight=0.5d0
-             ELSE
-                weight=1.d0
-             END IF
-          ELSE IF(iorder==2) THEN
-             !Composite extended formula weights
-             IF(i==1 .OR. i==n) THEN
-                weight=0.416666666666d0
-             ELSE IF(i==2 .OR. i==n-1) THEN
-                weight=1.083333333333d0
-             ELSE
-                weight=1.d0
-             END IF
-          ELSE IF(iorder==3) THEN
-             !Composite Simpson weights
-             IF(i==1 .OR. i==n) THEN
-                weight=0.375d0
-             ELSE IF(i==2 .OR. i==n-1) THEN
-                weight=1.166666666666
-             ELSE IF(i==3 .OR. i==n-2) THEN
-                weight=0.958333333333
-             ELSE
-                weight=1.d0
-             END IF
+          !Calculate the dx interval for this value of 'n'
+          dx=(b-a)/REAL(n-1)
+
+          IF(j==1) THEN
+             
+             !The first go is just the trapezium of the end points
+             f1=sigma_integrand_transformed(a,r,f1_rapid,z,cosm)
+             f2=sigma_integrand_transformed(b,r,f1_rapid,z,cosm)
+             sum_2n=0.5d0*(f1+f2)*dx
+             
           ELSE
-             STOP 'WININT_NORMAL: Error, order specified incorrectly'
+
+             !Loop over only new even points to add these to the integral
+             DO i=2,n,2
+                x=a+(b-a)*REAL(i-1)/REAL(n-1)
+                fx=sigma_integrand_transformed(x,r,f1_rapid,z,cosm)
+                sum_2n=sum_2n+fx
+             END DO
+
+             !Now create the total using the old and new parts
+             sum_2n=sum_n/2.d0+sum_2n*dx
+
+             !Now calculate the new sum depending on the integration order
+             IF(iorder==1) THEN  
+                sum_new=REAL(sum_2n)
+             ELSE IF(iorder==3) THEN         
+                sum_new=(4.d0*sum_2n-sum_n)/3.d0 !This is Simpson's rule and cancels error
+             ELSE
+                STOP 'SIGINT1: Error, iorder specified incorrectly'
+             END IF
+
           END IF
 
-          k=(-1.+1./x)/r**.5
-          sum2=sum2+weight*p_lin(k,z,cosm)*(wk_tophat(k*r)**2.)/(x*(1.-x))
+          IF((j>=jmin) .AND. (ABS(-1.d0+sum_new/sum_old)<acc)) THEN
+             !jmin avoids spurious early convergence
+             sigint1=REAL(sum_new)
+             EXIT
+          ELSE IF(j==jmax) THEN
+             STOP 'SIGINT1: Integration timed out'
+          ELSE
+             !Integral has not converged so store old sums and reset sum variables
+             sum_old=sum_new
+             sum_n=sum_2n
+             sum_2n=0.d0
+          END IF
 
        END DO
 
-       dx=(xmax-xmin)/REAL(n-1)
-       sum2=sum2*dx
-
-       IF(j .NE. 1 .AND. ABS(-1.+sum2/sum1)<acc) THEN
-          sigint1=REAL(sum2)
-          EXIT
-       ELSE IF(j==jmax) THEN
-          WRITE(*,*)
-          WRITE(*,*) 'SIGINT1: r:', r
-          WRITE(*,*) 'SIGINT1: Integration timed out'
-          WRITE(*,*)
-          STOP
-       ELSE
-          sum1=sum2
-          sum2=0.d0
-       END IF
-
-    END DO
+    END IF
 
   END FUNCTION sigint1
 
+  FUNCTION f1_rapid(r)
+
+    !This is the 'rapidising' function to increase integration speed
+    !for sigma(R). Found by trial-and-error
+    IMPLICIT NONE
+    REAL :: f1_rapid
+    REAL, INTENT(IN) :: r
+    REAL, PARAMETER :: alpha=0.5  
+
+    f1_rapid=r**alpha
+
+  END FUNCTION f1_rapid
+
   FUNCTION sigint2(r,z,cosm,acc,iorder)
 
-    !Integrates between a and b until desired accuracy is reached!
-    !USE cosdef
+    !Integrates between a and b until desired accuracy is reached
+    !Stores information to reduce function calls
     IMPLICIT NONE
     REAL :: sigint2
     REAL, INTENT(IN) :: r, z
+    TYPE(cosmology), INTENT(IN) :: cosm
     REAL, INTENT(IN) :: acc
     INTEGER, INTENT(IN) :: iorder
-    TYPE(cosmology), INTENT(IN) :: cosm
-    INTEGER :: i, j, n
-    REAL :: x, dx, weight, xmin, xmax, A
-    REAL*8 :: sum1, sum2
-    INTEGER, PARAMETER :: ninit=8 !Initial number of points
-    INTEGER, PARAMETER :: jmax=30 !Maximum number of attempts  
+    REAL :: a, b
+    INTEGER :: i, j
+    INTEGER :: n
+    REAL :: x, dx
+    REAL :: f1, f2, fx
+    REAL*8 :: sum_n, sum_2n, sum_new, sum_old
+    INTEGER, PARAMETER :: jmin=5
+    INTEGER, PARAMETER :: jmax=30
+    REAL, PARAMETER :: C=10. !How far to go out in 1/r units for integral
+    
+    a=1./r
+    b=C/r
 
-    sum1=0.d0
-    sum2=0.d0
+    IF(a==b) THEN
 
-    !How far to go out in 1/r units for integral
-    A=10.
+       !Fix the answer to zero if the integration limits are identical
+       sigint2=0.
 
-    xmin=1./r
-    xmax=A/r
+    ELSE
 
-    DO j=1,jmax
+       !Reset the sum variable for the integration
+       sum_2n=0.d0
 
-       n=ninit*2**(j-1)
+       DO j=1,jmax
+          
+          !Note, you need this to be 1+2**n for some integer n
+          !j=1 n=2; j=2 n=3; j=3 n=5; j=4 n=9; ...'
+          n=1+2**(j-1)
 
-       DO i=1,n
+          !Calculate the dx interval for this value of 'n'
+          dx=(b-a)/REAL(n-1)
 
-          x=xmin+(xmax-xmin)*float(i-1)/float(n-1)
-
-          !Get the weights
-          IF(iorder==1) THEN
-             !Composite trapezium weights
-             IF(i==1 .OR. i==n) THEN
-                weight=0.5d0
-             ELSE
-                weight=1.d0
-             END IF
-          ELSE IF(iorder==2) THEN
-             !Composite extended formula weights
-             IF(i==1 .OR. i==n) THEN
-                weight=0.416666666666d0
-             ELSE IF(i==2 .OR. i==n-1) THEN
-                weight=1.083333333333d0
-             ELSE
-                weight=1.d0
-             END IF
-          ELSE IF(iorder==3) THEN
-             !Composite Simpson weights
-             IF(i==1 .OR. i==n) THEN
-                weight=0.375d0
-             ELSE IF(i==2 .OR. i==n-1) THEN
-                weight=1.166666666666
-             ELSE IF(i==3 .OR. i==n-2) THEN
-                weight=0.958333333333
-             ELSE
-                weight=1.d0
-             END IF
+          IF(j==1) THEN
+             
+             !The first go is just the trapezium of the end points
+             f1=sigma_integrand(a,r,z,cosm)
+             f2=sigma_integrand(b,r,z,cosm)
+             sum_2n=0.5d0*(f1+f2)*dx
+             
           ELSE
-             STOP 'WININT_NORMAL: Error, order specified incorrectly'
+
+             !Loop over only new even points to add these to the integral
+             DO i=2,n,2
+                x=a+(b-a)*REAL(i-1)/REAL(n-1)
+                fx=sigma_integrand(x,r,z,cosm)
+                sum_2n=sum_2n+fx
+             END DO
+
+             !Now create the total using the old and new parts
+             sum_2n=sum_n/2.d0+sum_2n*dx
+
+             !Now calculate the new sum depending on the integration order
+             IF(iorder==1) THEN  
+                sum_new=sum_2n
+             ELSE IF(iorder==3) THEN         
+                sum_new=(4.d0*sum_2n-sum_n)/3.d0 !This is Simpson's rule and cancels error
+             ELSE
+                STOP 'SIGINT2: Error, iorder specified incorrectly'
+             END IF
+
           END IF
 
-          !Integrate linearly in k for the rapidly oscillating part
-          sum2=sum2+weight*p_lin(x,z,cosm)*(wk_tophat(x*r)**2.)/x
+          IF((j>=jmin) .AND. (ABS(-1.d0+sum_new/sum_old)<acc)) THEN
+             !jmin avoids spurious early convergence
+             sigint2=REAL(sum_new)
+             !WRITE(*,*) 'INTEGRATE_STORE: Nint:', n
+             EXIT
+          ELSE IF(j==jmax) THEN
+             STOP 'SIGINT2: Integration timed out'
+          ELSE
+             !Integral has not converged so store old sums and reset sum variables
+             sum_old=sum_new
+             sum_n=sum_2n
+             sum_2n=0.d0
+          END IF
 
        END DO
 
-       dx=(xmax-xmin)/REAL(n-1)
-       sum2=sum2*dx
-
-       IF(j .NE. 1 .AND. ABS(-1.+sum2/sum1)<acc) THEN
-          sigint2=REAL(sum2)
-          EXIT
-       ELSE IF(j==jmax) THEN
-          WRITE(*,*)
-          WRITE(*,*) 'SIGINT2: r:', r
-          WRITE(*,*) 'SIGINT2: Integration timed out'
-          WRITE(*,*)
-          STOP
-       ELSE
-          sum1=sum2
-          sum2=0.d0
-       END IF
-
-    END DO
+    END IF
 
   END FUNCTION sigint2
 
@@ -1707,22 +1748,6 @@ CONTAINS
 
   END FUNCTION gst
 
-  FUNCTION hubble2(z,cosm)
-
-    !Calculates Hubble^2 in units such that H^2(z=0)=1.
-    IMPLICIT NONE
-    REAL :: hubble2
-    REAL, INTENT(IN) :: z
-    REAL :: om_m, om_v, a
-    TYPE(cosmology), INTENT(IN) :: cosm
-    
-    om_m=cosm%om_m
-    om_v=cosm%om_v
-    a=1./(1.+z)
-    hubble2=(om_m*(1.+z)**3.)+om_v*X_de(a,cosm)+((1.-om_m-om_v)*(1.+z)**2.)
-
-  END FUNCTION hubble2
-
   FUNCTION omega_m(z,cosm)
 
     !This calculates Omega_m variations with z!
@@ -1733,7 +1758,7 @@ CONTAINS
     TYPE(cosmology), INTENT(IN) :: cosm
     
     om_m=cosm%om_m
-    omega_m=(om_m*(1.+z)**3.)/hubble2(z,cosm)
+    omega_m=(om_m*(1.+z)**3.)/H2(z,cosm)
 
   END FUNCTION omega_m
 
@@ -1755,194 +1780,239 @@ CONTAINS
 
   END FUNCTION grow
 
-  FUNCTION grow_int(b,cosm)
+  FUNCTION growint(a,cosm)
 
-    !Integrates between a and b with nint points until desired accuracy is reached!    
+    !Integrates between a and b until desired accuracy is reached
+    !Stores information to reduce function calls
     IMPLICIT NONE
-    REAL :: grow_int
-    REAL, INTENT(IN) :: b
+    REAL :: growint
+    REAL, INTENT(IN) :: a
     TYPE(cosmology), INTENT(IN) :: cosm
-    INTEGER :: i, j, n
-    REAL :: a, dx
-    REAL :: x, weight, func, gam
-    REAL*8 :: sum1, sum2
-    INTEGER, PARAMETER :: jmax=20
-    INTEGER, PARAMETER :: ninit=8
-    INTEGER, PARAMETER :: iorder=3
-    REAL, PARAMETER :: acc=1e-3
-    
-    sum1=0.d0
-    sum2=0.d0
+    REAL :: b
+    INTEGER :: i, j
+    INTEGER :: n
+    REAL :: x, dx
+    REAL :: f1, f2, fx
+    REAL*8 :: sum_n, sum_2n, sum_new, sum_old
+    INTEGER, PARAMETER :: jmin=5
+    INTEGER, PARAMETER :: jmax=30
+    REAL, PARAMETER :: acc=1e-4
+    INTEGER, PARAMETER :: iorder=3   
 
-    a=1.
-
-    IF(cosm%wa .NE. 0.) STOP 'This does not work for w(a)'
+    !Integration range for integration parameter
+    !Note a -> 1
+    b=1.d0
 
     IF(a==b) THEN
 
-       grow_int=1.
+       !Fix the answer to zero if the integration limits are identical
+       growint=exp(0.)
 
     ELSE
 
+       !Reset the sum variable for the integration
+       sum_2n=0.d0
+
        DO j=1,jmax
+          
+          !Note, you need this to be 1+2**n for some integer n
+          !j=1 n=2; j=2 n=3; j=3 n=5; j=4 n=9; ...'
+          n=1+2**(j-1)
 
-          n=ninit*(2**(j-1))
-
-          DO i=1,n
-
-             x=a+(b-a)*REAL(i-1)/REAL(n-1)
-
-             !IF(i==1 .OR. i==n) THEN
-             !   !multiple of 1 for beginning and end and multiple of 2 for middle points!
-             !   weight=0.5
-             !ELSE
-             !   weight=1.
-             !END IF
-
-             !Get the weights
-             IF(iorder==1) THEN
-                !Composite trapezium weights
-                IF(i==1 .OR. i==n) THEN
-                   weight=0.5d0
-                ELSE
-                   weight=1.d0
-                END IF
-             ELSE IF(iorder==2) THEN
-                !Composite extended formula weights
-                IF(i==1 .OR. i==n) THEN
-                   weight=0.416666666666d0
-                ELSE IF(i==2 .OR. i==n-1) THEN
-                   weight=1.083333333333d0
-                ELSE
-                   weight=1.d0
-                END IF
-             ELSE IF(iorder==3) THEN
-                !Composite Simpson weights
-                IF(i==1 .OR. i==n) THEN
-                   weight=0.375d0
-                ELSE IF(i==2 .OR. i==n-1) THEN
-                   weight=1.166666666666
-                ELSE IF(i==3 .OR. i==n-2) THEN
-                   weight=0.958333333333
-                ELSE
-                   weight=1.d0
-                END IF
-             ELSE
-                STOP 'SIGMA_V: Error, order specified incorrectly'
-             END IF
-
-             !Insert function here!
-             IF(cosm%w<-1.) THEN
-                gam=0.55+0.02*(1.+cosm%w)
-             ELSE IF(cosm%w>-1) THEN
-                gam=0.55+0.05*(1.+cosm%w)
-             ELSE
-                gam=0.55
-             END IF
-
-             func=(omega_m(-1.+1./x,cosm)**gam)/x
-
-             sum2=sum2+weight*func
-
-          END DO
-
+          !Calculate the dx interval for this value of 'n'
           dx=(b-a)/REAL(n-1)
-          sum2=sum2*dx
 
-          IF(j .NE. 1 .AND. ABS(-1.+sum2/sum1)<acc) THEN
-             grow_int=real(exp(sum2))
+          IF(j==1) THEN
+             
+             !The first go is just the trapezium of the end points
+             f1=growint_integrand(a,cosm)
+             f2=growint_integrand(b,cosm)
+             sum_2n=0.5d0*(f1+f2)*dx
+             
+          ELSE
+
+             !Loop over only new even points to add these to the integral
+             DO i=2,n,2
+                x=a+(b-a)*REAL(i-1)/REAL(n-1)
+                fx=growint_integrand(x,cosm)
+                sum_2n=sum_2n+fx
+             END DO
+
+             !Now create the total using the old and new parts
+             sum_2n=sum_n/2.d0+sum_2n*dx
+
+             !Now calculate the new sum depending on the integration order
+             IF(iorder==1) THEN  
+                sum_new=sum_2n
+             ELSE IF(iorder==3) THEN         
+                sum_new=(4.d0*sum_2n-sum_n)/3.d0 !This is Simpson's rule and cancels error
+             ELSE
+                STOP 'GROWINT: Error, iorder specified incorrectly'
+             END IF
+
+          END IF
+
+          IF((j>=jmin) .AND. (ABS(-1.d0+sum_new/sum_old)<acc)) THEN
+             !jmin avoids spurious early convergence
+             growint=REAL(exp(sum_new))
              EXIT
           ELSE IF(j==jmax) THEN
-             STOP 'GROW_INT: Error, integration timed out'
+             STOP 'GROWINT: Integration timed out'
           ELSE
-             sum1=sum2
-             sum2=0.d0
+             !Integral has not converged so store old sums and reset sum variables
+             sum_old=sum_new
+             sum_n=sum_2n
+             sum_2n=0.d0
           END IF
 
        END DO
 
     END IF
 
-  END FUNCTION grow_int
+  END FUNCTION growint
 
-  FUNCTION dispint(z,cosm)
+  FUNCTION growint_integrand(a,cosm)
 
-    !Calcualtes the total variance in the displacement field (finite for CDM spectra)
+    !Integrand for the approximate growth integral
+    IMPLICIT NONE
+    REAL :: growint_integrand
+    REAL, INTENT(IN) :: a
+    TYPE(cosmology), INTENT(IN) :: cosm
+    REAL :: gam
+    
+    IF(cosm%w<-1.) THEN
+       gam=0.55+0.02*(1.+cosm%w)
+    ELSE IF(cosm%w>-1) THEN
+       gam=0.55+0.05*(1.+cosm%w)
+    ELSE
+       gam=0.55
+    END IF
+
+    !Note the minus sign here
+    growint_integrand=-(Omega_m(-1.+1./a,cosm)**gam)/a
+    
+  END FUNCTION growint_integrand
+
+  FUNCTION dispint(R,z,cosm)
+
+    !Integrates between a and b until desired accuracy is reached
+    !Stores information to reduce function calls
     IMPLICIT NONE
     REAL :: dispint
-    REAL, INTENT(IN) :: z
-    REAL*8 :: sum, oldsum
-    REAL :: dtheta, k, theta, weight
-    INTEGER :: i, j, n
+    REAL, INTENT(IN) :: z, R
     TYPE(cosmology), INTENT(IN) :: cosm
+    REAL :: a, b
+    INTEGER :: i, j
+    INTEGER :: n
+    REAL :: x, dx
+    REAL :: f1, f2, fx
+    REAL*8 :: sum_n, sum_2n, sum_new, sum_old
+    INTEGER, PARAMETER :: jmin=5
     INTEGER, PARAMETER :: jmax=30
-    INTEGER, PARAMETER :: ninit=8
-    REAL, PARAMETER :: acc=1e-3
-    INTEGER, PARAMETER :: iorder=3
+    REAL, PARAMETER :: acc=1e-4
+    INTEGER, PARAMETER :: iorder=3   
 
-    DO j=1,jmax
+    !Integration range for integration parameter
+    !Note 0 -> infinity in k has changed to 0 -> 1 in x
+    a=0.d0
+    b=1.d0
 
-       n=ninit*(2**(j-1))
+    IF(a==b) THEN
 
-       sum=0.d0     
+       !Fix the answer to zero if the integration limits are identical
+       dispint=0.
 
-       DO i=2,n-1
+    ELSE
 
-          !Get the weights
-             IF(iorder==1) THEN
-                !Composite trapezium weights
-                IF(i==1 .OR. i==n) THEN
-                   weight=0.5d0
-                ELSE
-                   weight=1.d0
-                END IF
-             ELSE IF(iorder==2) THEN
-                !Composite extended formula weights
-                IF(i==1 .OR. i==n) THEN
-                   weight=0.416666666666d0
-                ELSE IF(i==2 .OR. i==n-1) THEN
-                   weight=1.083333333333d0
-                ELSE
-                   weight=1.d0
-                END IF
-             ELSE IF(iorder==3) THEN
-                !Composite Simpson weights
-                IF(i==1 .OR. i==n) THEN
-                   weight=0.375d0
-                ELSE IF(i==2 .OR. i==n-1) THEN
-                   weight=1.166666666666
-                ELSE IF(i==3 .OR. i==n-2) THEN
-                   weight=0.958333333333
-                ELSE
-                   weight=1.d0
-                END IF
+       !Reset the sum variable for the integration
+       sum_2n=0.d0
+
+       DO j=1,jmax
+          
+          !Note, you need this to be 1+2**n for some integer n
+          !j=1 n=2; j=2 n=3; j=3 n=5; j=4 n=9; ...'
+          n=1+2**(j-1)
+
+          !Calculate the dx interval for this value of 'n'
+          dx=(b-a)/REAL(n-1)
+
+          IF(j==1) THEN
+             
+             !The first go is just the trapezium of the end points
+             f1=dispint_integrand(a,R,z,cosm)
+             f2=dispint_integrand(b,R,z,cosm)
+             sum_2n=0.5d0*(f1+f2)*dx
+             
+          ELSE
+
+             !Loop over only new even points to add these to the integral
+             DO i=2,n,2
+                x=a+(b-a)*REAL(i-1)/REAL(n-1)
+                fx=dispint_integrand(x,R,z,cosm)
+                sum_2n=sum_2n+fx
+             END DO
+
+             !Now create the total using the old and new parts
+             sum_2n=sum_n/2.d0+sum_2n*dx
+
+             !Now calculate the new sum depending on the integration order
+             IF(iorder==1) THEN  
+                sum_new=sum_2n
+             ELSE IF(iorder==3) THEN         
+                sum_new=(4.d0*sum_2n-sum_n)/3.d0 !This is Simpson's rule and cancels error
              ELSE
-                STOP 'DISPINT: Error, order specified incorrectly'
+                STOP 'DISPINT: Error, iorder specified incorrectly'
              END IF
 
-          !theta converts integral to 0->1 range
-          !Values at the end points are 0 so removed for convenience
-          theta=REAL(i-1)/REAL(n-1)
-          k=(-1.+1./theta)          
-          sum=sum+((1.+k)**2)*p_lin(k,z,cosm)/(k**3)!((k**3.)*theta**2.)
+          END IF
+
+          IF((j>=jmin) .AND. (ABS(-1.d0+sum_new/sum_old)<acc)) THEN
+             !jmin avoids spurious early convergence
+             dispint=REAL(sum_new)
+             EXIT
+          ELSE IF(j==jmax) THEN
+             STOP 'DISPINT: Integration timed out'
+          ELSE
+             !Integral has not converged so store old sums and reset sum variables
+             sum_old=sum_new
+             sum_n=sum_2n
+             sum_2n=0.d0
+          END IF
 
        END DO
 
-       dtheta=1./REAL(n-1)
-       sum=sum*dtheta
-
-       IF(j>1 .AND. ABS(-1.+sum/oldsum)<acc) THEN  
-          dispint=real(sum/3.d0)
-          EXIT
-       ELSE IF(j==jmax) THEN
-          STOP 'SIGMA_V: Error, integration timed out'
-       ELSE
-          oldsum=sum
-       END IF
-
-    END DO
+    END IF
 
   END FUNCTION dispint
+
+  FUNCTION dispint_integrand(theta,R,z,cosm)
+
+    !This is the integrand for the velocity dispersion integral
+    IMPLICIT NONE
+    REAL :: dispint_integrand
+    REAL, INTENT(IN) :: theta, z, R
+    TYPE(cosmology), INTENT(IN) :: cosm
+    REAL :: k
+    REAL, PARAMETER :: alpha=1.65 !Speeds up integral for large 'R'
+    REAL, PARAMETER :: Rsplit=10. !Value to impliment speed up
+
+    !Note that I have not included the speed up alpha and Rsplit
+    !The choice of alpha=1.65 seemed to work well for R=100.
+    !Rsplit=10 is thoughlessly chosen (only because 100.>10.)
+    !Including this seems to make things slower (faster integration but slower IF statements?)
+
+    IF(theta==0.d0 .OR. theta==1.d0) THEN
+       dispint_integrand=0.d0
+    ELSE
+       !IF(r>Rsplit) THEN
+       !   k=(-1.d0+1.d0/theta)/r**alpha
+       !ELSE
+       k=(-1.+1./theta)
+       !END IF
+       dispint_integrand=(p_lin(k,z,cosm)/k**2)*(wk_tophat(k*r)**2)/(theta*(1.d0-theta))
+    END IF
+    
+  END FUNCTION dispint_integrand
 
   FUNCTION Si(x)
 
@@ -2557,7 +2627,7 @@ CONTAINS
     xn=xtab(n)
 
     !Test for linear table
-    acc=0.001
+    acc=1e-3
 
     IF(x1>xn) STOP 'LINEAR_TABLE_INTEGER :: table in the wrong order'
     IF(ABS(-1.+float(n-1)*(x2-x1)/(xn-x1))>acc) STOP 'LINEAR_TABLE_INTEGER :: table does not seem to be linear'
@@ -2906,7 +2976,7 @@ CONTAINS
     z=-1.+(1./a)
 
     f1=3.*omega_m(z,cosm)*d/(2.*(a**2.))
-    f2=(2.+AH(z,cosm)/hubble2(z,cosm))*(v/a)
+    f2=(2.+AH(z,cosm)/H2(z,cosm))*(v/a)
 
     fv=f1-f2
 
@@ -2924,6 +2994,22 @@ CONTAINS
     fd=v
 
   END FUNCTION fd
+
+  FUNCTION H2(z,cosm)
+
+    !Calculates Hubble^2 in units such that H^2(z=0)=1.
+    IMPLICIT NONE
+    REAL :: H2
+    REAL, INTENT(IN) :: z
+    REAL :: om_m, om_v, a
+    TYPE(cosmology), INTENT(IN) :: cosm
+    
+    om_m=cosm%om_m
+    om_v=cosm%om_v
+    a=1./(1.+z)
+    H2=(om_m*(1.+z)**3.)+om_v*X_de(a,cosm)+((1.-om_m-om_v)*(1.+z)**2.)
+
+  END FUNCTION H2
 
   FUNCTION AH(z,cosm)
 
