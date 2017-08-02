@@ -28,10 +28,12 @@ PROGRAM HMcode
   INTEGER :: i, j, nk, nz
   INTEGER :: ihm
   REAL :: kmin, kmax, zmin, zmax
-  REAL, PARAMETER :: pi=3.141592654
   TYPE(cosmology) :: cosi
   TYPE(tables) :: lut
   CHARACTER(len=64) :: output
+
+  !Constants
+  REAL, PARAMETER :: pi=3.141592654
 
   !imead parameter
   !0 - Do the standard halo model calculation (Dv=200, dc=1.686, Sheth & Tormen (199) mass function, Bullock (2001) c(M)'
@@ -376,6 +378,31 @@ CONTAINS
     END IF
 
   END SUBROUTINE fill_table
+
+  SUBROUTINE fill_table8(min,max,arr,n)
+
+    !Fills array 'arr' in equally spaced intervals
+    !I'm not sure if inputting an array like this is okay
+    IMPLICIT NONE
+    INTEGER :: i
+    REAL*8, INTENT(IN) :: min, max
+    REAL*8, ALLOCATABLE :: arr(:)
+    INTEGER, INTENT(IN) :: n
+
+    !Allocate the array, and deallocate it if it is full
+    IF(ALLOCATED(arr)) DEALLOCATE(arr)
+    ALLOCATE(arr(n))
+    arr=0.
+
+    IF(n==1) THEN
+       arr(1)=min
+    ELSE IF(n>1) THEN
+       DO i=1,n
+          arr(i)=min+(max-min)*float(i-1)/float(n-1)
+       END DO
+    END IF
+
+  END SUBROUTINE fill_table8
 
   SUBROUTINE write_cosmology(cosm)
 
@@ -887,11 +914,13 @@ CONTAINS
     bn=8.41*(om_m*h*h)**0.435
     ss=s/(1.+(bn/rk/s)**3.)**(1./3.)
     tb=log(e+1.8*q)/(log(e+1.8*q)+c1*q*q)/(1+(rk*s/5.2)**2.)
-    IF((rk/rks**1.4)>7.) THEN
-       fac=0.
-    ELSE
-       fac=exp(-(rk/rks)**1.4)
-    END IF
+    !IF((rk/rks**1.4)>10.) THEN
+    !   fac=0.
+    !ELSE
+    !Removed this IF statement as it produced a discontinuity in P_lin(k) as cosmology
+    !was varied - thanks David Copeland for pointing this out
+    fac=exp(-(rk/rks)**1.4)
+    !END IF
     tb=(tb+ab*fac/(1.+(bb/rk/s)**3.))*sin(rk*ss)/rk/ss
 
     tk_eh=real((om_b/om_m)*tb+(1-om_b/om_m)*tc)
@@ -1049,91 +1078,6 @@ CONTAINS
     IF(ihm==1) WRITE(*,*)
 
   END SUBROUTINE fill_sigtab
-
-!!$  FUNCTION sigma_v(R,z,cosm)
-!!$
-!!$    IMPLICIT NONE
-!!$    REAL :: sigma_v
-!!$    REAL, INTENT(IN) :: z, R
-!!$    TYPE(cosmology), INTENT(IN) :: cosm
-!!$    REAL*8 :: sum, oldsum
-!!$    REAL :: weight
-!!$    REAL :: dtheta, k, theta
-!!$    INTEGER :: i, j, n
-!!$    REAL, PARAMETER :: acc=1e-3 !Accuracy of integration
-!!$    INTEGER, PARAMETER :: ninit=8 !Initial number of points
-!!$    INTEGER, PARAMETER :: jmax=30 !Maximum number of attempts
-!!$    REAL, PARAMETER :: alpha=1.65 !Speeds up integral
-!!$    INTEGER, PARAMETER :: iorder=3 !Set integration order
-!!$
-!!$    DO j=1,jmax
-!!$
-!!$       !Number of integration points for each iteration
-!!$       n=ninit*(2**(j-1))
-!!$
-!!$       !Set the integration sum variable to zero
-!!$       sum=0.d0      
-!!$
-!!$       !Note that contribution from end points is zero
-!!$       DO i=2,n-1
-!!$
-!!$          !Get the weights
-!!$          IF(iorder==1) THEN
-!!$             !Composite trapezium weights
-!!$             IF(i==1 .OR. i==n) THEN
-!!$                weight=0.5d0
-!!$             ELSE
-!!$                weight=1.d0
-!!$             END IF
-!!$          ELSE IF(iorder==2) THEN
-!!$             !Composite extended formula weights
-!!$             IF(i==1 .OR. i==n) THEN
-!!$                weight=0.416666666666d0
-!!$             ELSE IF(i==2 .OR. i==n-1) THEN
-!!$                weight=1.083333333333d0
-!!$             ELSE
-!!$                weight=1.d0
-!!$             END IF
-!!$          ELSE IF(iorder==3) THEN
-!!$             !Composite Simpson weights
-!!$             IF(i==1 .OR. i==n) THEN
-!!$                weight=0.375d0
-!!$             ELSE IF(i==2 .OR. i==n-1) THEN
-!!$                weight=1.166666666666
-!!$             ELSE IF(i==3 .OR. i==n-2) THEN
-!!$                weight=0.958333333333
-!!$             ELSE
-!!$                weight=1.d0
-!!$             END IF
-!!$          ELSE
-!!$             STOP 'SIGMA_V: Error, order specified incorrectly'
-!!$          END IF
-!!$          
-!!$          !theta converts integral to 0->1 range
-!!$          !Values at the end points are 0 so removed for convenience
-!!$          theta=REAL(i-1)/REAL(n-1)
-!!$          k=(-1.+1./theta)/r**alpha
-!!$          sum=sum+weight*p_lin(k,z,cosm)*(wk_tophat(k*r)**2.)/((k**2.)*theta*(1.-theta))
-!!$
-!!$       END DO
-!!$
-!!$       !Calculate the integration dx and multiply through
-!!$       dtheta=1./REAL(n-1)
-!!$       sum=sum*dtheta
-!!$
-!!$       IF(j>1 .AND. ABS(-1.+sum/oldsum)<acc) THEN
-!!$          !Convert from sigma_v^2 and to 1D dispersion
-!!$          sigma_v=real(sqrt(sum/3.d0))
-!!$          EXIT
-!!$       ELSE IF(j==jmax) THEN
-!!$          STOP 'SIGMA_V: Error, integration timed out'
-!!$       ELSE
-!!$          oldsum=sum
-!!$       END IF
-!!$
-!!$    END DO
-!!$
-!!$  END FUNCTION sigma_v
 
   FUNCTION sigma_cb(r,z,cosm)
 
@@ -2009,7 +1953,7 @@ CONTAINS
        !ELSE
        k=(-1.+1./theta)
        !END IF
-       dispint_integrand=(p_lin(k,z,cosm)/k**2)*(wk_tophat(k*r)**2)/(theta*(1.d0-theta))
+       dispint_integrand=(p_lin(k,z,cosm)/k**2)*(wk_tophat(k*r)**2)/(theta*(1.-theta))
     END IF
     
   END FUNCTION dispint_integrand
@@ -2615,7 +2559,7 @@ CONTAINS
     INTEGER, INTENT(IN) :: n
     REAL, INTENT(IN) :: x, xtab(n)
     REAL :: x1, x2, xn
-    REAL :: acc
+    REAL, PARAMETER :: acc=1e-4 !Test for linear table
 
     !Returns the integer (table position) below the value of x
     !eg. if x(3)=6. and x(4)=7. and x=6.5 this will return 6
@@ -2624,10 +2568,7 @@ CONTAINS
     !n=SIZE(xtab)
     x1=xtab(1)
     x2=xtab(2)
-    xn=xtab(n)
-
-    !Test for linear table
-    acc=1e-3
+    xn=xtab(n)   
 
     IF(x1>xn) STOP 'LINEAR_TABLE_INTEGER :: table in the wrong order'
     IF(ABS(-1.+float(n-1)*(x2-x1)/(xn-x1))>acc) STOP 'LINEAR_TABLE_INTEGER :: table does not seem to be linear'
@@ -2795,8 +2736,8 @@ CONTAINS
     REAL :: a, norm
     REAL, ALLOCATABLE :: d_tab(:), v_tab(:), a_tab(:)
     REAL :: ainit, amax, dinit, vinit
-    REAL :: acc
     INTEGER, PARAMETER :: n=64 !Number of entries for growth tables
+    REAL, PARAMETER :: acc=1e-4 !Overall accuracy for the ODE solver
 
     !The calculation should start at a z when Om_m(z)=1., so that the assumption
     !of starting in the g\propto a growing mode is valid (this will not work for early DE)
@@ -2806,10 +2747,7 @@ CONTAINS
 
     !These set the initial conditions to be the Om_m=1. growing mode
     dinit=ainit
-    vinit=1.
-
-    !Overall accuracy for the ODE solver
-    acc=0.001
+    vinit=1.    
 
     IF(ihm==1) WRITE(*,*) 'GROWTH: Solving growth equation'
     CALL ode_growth(d_tab,v_tab,a_tab,0.,ainit,amax,dinit,vinit,acc,3,cosm)
@@ -2845,6 +2783,8 @@ CONTAINS
     REAL, ALLOCATABLE :: x(:), v(:), t(:)
     INTEGER :: i, j, k, n, np, ifail, kn, imeth
     TYPE(cosmology) :: cosm
+    INTEGER, PARAMETER :: jmax=30
+    INTEGER, PARAMETER :: ninit=100
 
     !xi and vi are the initial values of x and v (i.e. x(ti), v(ti))
     !fx is what x' is equal to
@@ -2856,23 +2796,31 @@ CONTAINS
     IF(ALLOCATED(v)) DEALLOCATE(v)
     IF(ALLOCATED(t)) DEALLOCATE(t)
 
-    DO j=1,30
+    DO j=1,jmax
 
-       n=100*(2**(j-1))
+       !Set the number of points for the forward integration
+       n=ninit*(2**(j-1))
        n=n+1  
 
+       !Allocate arrays
        ALLOCATE(x8(n),t8(n),v8(n))
 
+       !Set the arrays to initialy be zeroes (is this neceseary?)
        x8=0.d0
        t8=0.d0
        v8=0.d0
 
-       dt=(tf-ti)/float(n-1)
-
+       !Set the intial conditions at the intial time
        x8(1)=xi
        v8(1)=vi
-       t8(1)=ti
 
+       !Fill up a table for the time values
+       CALL fill_table8(DBLE(ti),DBLE(tf),t8,n)
+
+       !Set the time interval
+       dt=(tf-ti)/float(n-1)
+
+       !Intially fix this to zero. It will change to 1 if method is a 'failure'
        ifail=0
 
        DO i=1,n-1
@@ -2884,22 +2832,24 @@ CONTAINS
           IF(imeth==1) THEN
 
              !Crude method
-             v8(i+1)=v8(i)+fv(x4,v4,kk,t4,cosm)*dt
-             x8(i+1)=x8(i)+fd(x4,v4,kk,t4,cosm)*dt
-             t8(i+1)=t8(i)+dt
+             kx1=dt*fd(x4,v4,kk,t4,cosm)
+             kv1=dt*fv(x4,v4,kk,t4,cosm)
 
+             x8(i+1)=x8(i)+kx1
+             v8(i+1)=v8(i)+kv1
+                  
           ELSE IF(imeth==2) THEN
 
              !Mid-point method
+             !2017/06/18 - There was a bug in this part before. Luckily it was not used. Thanks Dipak Munshi.
              kx1=dt*fd(x4,v4,kk,t4,cosm)
              kv1=dt*fv(x4,v4,kk,t4,cosm)
              kx2=dt*fd(x4+kx1/2.,v4+kv1/2.,kk,t4+dt/2.,cosm)
              kv2=dt*fv(x4+kx1/2.,v4+kv1/2.,kk,t4+dt/2.,cosm)
 
-             v8(i+1)=v8(i)+kv2*dt
-             x8(i+1)=x8(i)+kx2*dt
-             t8(i+1)=t8(i)+dt
-
+             x8(i+1)=x8(i)+kx2
+             v8(i+1)=v8(i)+kv2
+             
           ELSE IF(imeth==3) THEN
 
              !4th order Runge-Kutta method (fast!)
@@ -2914,9 +2864,10 @@ CONTAINS
 
              x8(i+1)=x8(i)+(kx1+(2.*kx2)+(2.*kx3)+kx4)/6.
              v8(i+1)=v8(i)+(kv1+(2.*kv2)+(2.*kv3)+kv4)/6.
-             t8(i+1)=t8(i)+dt
 
           END IF
+
+          !t8(i+1)=t8(i)+dt
 
        END DO
 
