@@ -599,10 +599,13 @@ CONTAINS
     !The computes other tables necessary for the one-halo integral
     IMPLICIT NONE
     REAL, INTENT(IN) :: z
-    INTEGER :: i, n
-    REAL :: Dv, dc, f, m, mmin, mmax, nu, r, sig
+    INTEGER :: i
+    REAL :: Dv, dc, f, m, nu, r, sig
     TYPE(cosmology) :: cosm
     TYPE(tables) :: lut
+    REAL, PARAMETER :: mmin=1e2 !Minimum mass for integration
+    REAL, PARAMETER :: mmax=1e18 !Maximum mass for integration
+    INTEGER, PARAMETER :: n=256 !Number of points for integration
     
     !Find value of sigma_v
     lut%sigv=sqrt(dispint(0.,z,cosm)/3.)
@@ -618,13 +621,8 @@ CONTAINS
 
     IF(ALLOCATED(lut%rr)) CALL deallocate_LUT(lut)
 
-    n=256
     lut%n=n
     CALL allocate_lut(lut)
-
-    !Mass range for halo model calculation
-    mmin=1.e2
-    mmax=1.e18
 
     dc=delta_c(z,cosm)
 
@@ -1351,6 +1349,7 @@ CONTAINS
              f1=sigma_integrand_transformed(a,r,f0_rapid,z,cosm)
              f2=sigma_integrand_transformed(b,r,f0_rapid,z,cosm)
              sum_2n=0.5d0*(f1+f2)*dx
+             sum_new=sum_2n
              
           ELSE
 
@@ -1464,6 +1463,7 @@ CONTAINS
              f1=sigma_integrand_transformed(a,r,f1_rapid,z,cosm)
              f2=sigma_integrand_transformed(b,r,f1_rapid,z,cosm)
              sum_2n=0.5d0*(f1+f2)*dx
+             sum_new=sum_2n
              
           ELSE
 
@@ -1479,7 +1479,7 @@ CONTAINS
 
              !Now calculate the new sum depending on the integration order
              IF(iorder==1) THEN  
-                sum_new=REAL(sum_2n)
+                sum_new=sum_2n
              ELSE IF(iorder==3) THEN         
                 sum_new=(4.d0*sum_2n-sum_n)/3.d0 !This is Simpson's rule and cancels error
              ELSE
@@ -1568,6 +1568,7 @@ CONTAINS
              f1=sigma_integrand(a,r,z,cosm)
              f2=sigma_integrand(b,r,z,cosm)
              sum_2n=0.5d0*(f1+f2)*dx
+             sum_new=sum_2n
              
           ELSE
 
@@ -1772,6 +1773,7 @@ CONTAINS
              f1=growint_integrand(a,cosm)
              f2=growint_integrand(b,cosm)
              sum_2n=0.5d0*(f1+f2)*dx
+             sum_new=sum_2n
              
           ELSE
 
@@ -1886,6 +1888,7 @@ CONTAINS
              f1=dispint_integrand(a,R,z,cosm)
              f2=dispint_integrand(b,R,z,cosm)
              sum_2n=0.5d0*(f1+f2)*dx
+             sum_new=sum_2n
              
           ELSE
 
