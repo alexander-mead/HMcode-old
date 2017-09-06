@@ -36,18 +36,23 @@ PROGRAM HMcode
   REAL, PARAMETER :: pi=3.141592654
 
   !imead parameter
-  !0 - Do the standard halo model calculation (Dv=200, dc=1.686, Sheth & Tormen (199) mass function, Bullock (2001) c(M)'
+  !0 - Do the standard halo model calculation (Dv=200, dc=1.686, Sheth & Tormen (1999) mass function, Bullock (2001) c(M)'
   !1 - Do the accurate calculation detailed in Mead et al. (2015; 1505.07833) with updates from Mead et al. (2016; 1602.02154)
   INTEGER, PARAMETER :: imead=1
+  
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  !2016/09/19 - changed subroutines so that none assume an array size
-  !2017/06/01 - added comments, made recompatible with ifort
+  !2016/09/19 - Changed subroutines so that none assume an array size
+  !2017/06/01 - Added comments, made recompatible with ifort (thanks Dipak Munshi)
+  !2017/06/15 - Removed bug in E+H (1997) fitting function that created small spikes in linear P(k) (thanks David Copeland)
+  !2017/08/?? - Increased integration routine speed
 
   !HMcode developed by Alexander Mead
-  !If you use this in your work please cite the original paper: http://arxiv.org/abs/1505.07833 and maybe the update: http://arxiv.org/abs/1602.02154
-  !and consider citing the source code at ASCL: http://ascl.net/1508.001
+  !If you use this in your work please cite the original paper: http://arxiv.org/abs/1505.07833
+  !Also maybe cite the update: http://arxiv.org/abs/1602.02154
+  !Also consider citing the source code at ASCL: http://ascl.net/1508.001
 
-  !ihm parameter
+  !ihm variable (cannot be parameter because value is changed in code)
   !0 - Non-verbose
   !1 - Verbose
   ihm=1
