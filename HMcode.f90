@@ -4,6 +4,7 @@ MODULE cosdef
      !Contains only things that do not need to be recalculated with each new z
      REAL :: om_m, om_b, om_v, om_c, h, n, sig8, w, wa
      REAL :: A
+     REAL :: eta0, Abary
      REAL, ALLOCATABLE :: r_sigma(:), sigma(:)
      REAL, ALLOCATABLE :: growth(:), a_growth(:)
      INTEGER :: nsig, ng
@@ -46,6 +47,7 @@ PROGRAM HMcode
   !2017/06/01 - Added comments, made recompatible with ifort (thanks Dipak Munshi)
   !2017/06/15 - Removed bug in E+H (1997) fitting function that created small spikes in linear P(k) (thanks David Copeland)
   !2017/08/?? - Increased integration routine speed
+  !2017/09/27 - Added baryon models explicitly
 
   !HMcode developed by Alexander Mead
   !If you use this in your work please cite the original paper: http://arxiv.org/abs/1505.07833
@@ -205,7 +207,8 @@ CONTAINS
        eta=0.
     ELSE IF(imead==1) THEN
        !The first parameter here is 'eta_0' in Mead et al. (2015; arXiv 1505.07833)
-       eta=0.603-0.3*(sigma_cb(8.,z,cosm))
+       !eta=0.603-0.3*(sigma_cb(8.,z,cosm))
+       eta=cosm%eta0-0.3*(sigma_cb(8.,z,cosm))
     ELSE
        STOP 'Error, imead defined incorrectly'
     END IF
@@ -243,7 +246,7 @@ CONTAINS
        As=4.
     ELSE IF(imead==1) THEN
        !This is the 'A' halo-concentration parameter in Mead et al. (2015; arXiv 1505.07833)
-       As=3.13
+       As=cosm%Abary
     ELSE
        STOP 'Error, imead defined incorrectly'
     END IF
@@ -436,6 +439,7 @@ CONTAINS
     IMPLICIT NONE
     TYPE(cosmology) :: cosm
 
+    !Standard cosmological parameters
     cosm%om_m=0.3
     cosm%om_v=1.-cosm%om_m
     cosm%om_b=0.05
@@ -445,6 +449,15 @@ CONTAINS
     cosm%sig8=0.8
     cosm%n=0.96
     cosm%wa=0.
+
+    !Baryon feedback parameters
+    cosm%Abary=3.13 !DMONLY
+    !cosm%Abary=3.12 !REF
+    !cosm%Abary=2.41 !DBLIM
+    !cosm%Abary=2.11 !AGN
+
+    !Enfore one-parameter baryon model (see Mead et al. 2015)
+    cosm%eta0=0.98-0.12*cosm%Abary
 
   END SUBROUTINE assign_cosmology
 
