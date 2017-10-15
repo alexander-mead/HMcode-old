@@ -771,6 +771,7 @@ CONTAINS
        DEALLOCATE(cos_lcdm%a_growth)
        cos_lcdm%w=-1.
        cos_lcdm%wa=0.
+       cos_lcdm%om_v=1.-cosm%om_m !Added this so that 'making a LCDM cosmology' works for curved models.
 
        ainf=1./(1.+zinf)
 
