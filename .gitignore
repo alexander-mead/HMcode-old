@@ -1,0 +1,11 @@
+#
+*.dat
+*.p
+*.p~
+*.e
+*.eps
+*.mod
+warm/
+BACKUP/
+OLD/
+.gitignore~
