@@ -455,6 +455,7 @@ CONTAINS
     !cosm%Abary=3.12 !REF
     !cosm%Abary=2.41 !DBLIM
     !cosm%Abary=2.11 !AGN
+    !cosm%Abary=5.
 
     !Enfore one-parameter baryon model (see Mead et al. 2015)
     cosm%eta0=0.98-0.12*cosm%Abary
