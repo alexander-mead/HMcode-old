@@ -495,7 +495,7 @@ CONTAINS
     !LOGICAL, INTENT(IN) :: itab
     TYPE(cosmology), INTENT(OUT) :: cosm
 
-    !Read in linear P(k) or not
+    !Read in linear P(k) or not; set to false by default
     cosm%itab=.FALSE.
 
     !Standard cosmological parameters
@@ -539,6 +539,9 @@ CONTAINS
        cosm%plin=cosm%plin*(grow(0.,cosm)/grow(cosm%pkz,cosm))**2
        cosm%plin=log(cosm%plin)
        cosm%k_plin=log(cosm%k_plin)
+       sigi=sigma(8.,0.,cosm)
+       cosm%sig8=sigi
+       IF(ihm==1) WRITE(*,*) 'INITIALISE: sigma_8:', sigi
        IF(ihm==1) WRITE(*,*) 'INITIALISE: Done'
        IF(ihm==1) WRITE(*,*)
 
