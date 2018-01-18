@@ -3,11 +3,13 @@ MODULE cosdef
   TYPE cosmology
      !Contains only things that do not need to be recalculated with each new z
      REAL :: om_m, om_b, om_v, om_c, h, n, sig8, w, wa
-     REAL :: A
+     REAL :: A, pkz
      REAL :: eta0, Abary
+     REAL, ALLOCATABLE :: k_plin(:), Plin(:)
      REAL, ALLOCATABLE :: r_sigma(:), sigma(:)
-     REAL, ALLOCATABLE :: growth(:), a_growth(:)
-     INTEGER :: nsig, ng
+     REAL, ALLOCATABLE :: a_growth(:), growth(:)
+     INTEGER :: nsig, ng, nk
+     LOGICAL :: itab
   END TYPE cosmology
 
   TYPE tables
@@ -28,10 +30,11 @@ PROGRAM HMcode
   REAL, ALLOCATABLE :: k(:), ztab(:), ptab(:,:)
   INTEGER :: i, j, nk, nz
   INTEGER :: ihm
-  REAL :: kmin, kmax, zmin, zmax
-  TYPE(cosmology) :: cosi
+  REAL :: kmin, kmax, zmin, zmax, zin
+  TYPE(cosmology) :: cosm
   TYPE(tables) :: lut
-  CHARACTER(len=64) :: output
+  CHARACTER(len=256) :: infile, outfile, redshift
+  LOGICAL :: lexist, itab
 
   !Constants
   REAL, PARAMETER :: pi=3.141592654
@@ -45,9 +48,10 @@ PROGRAM HMcode
 
   !2016/09/19 - Changed subroutines so that none assume an array size
   !2017/06/01 - Added comments, made recompatible with ifort (thanks Dipak Munshi)
-  !2017/06/15 - Removed bug in E+H (1997) fitting function that created small spikes in linear P(k) (thanks David Copeland)
+  !2017/06/15 - Removed bug in E&H (1997) fitting function that created small spikes in linear P(k) (thanks David Copeland)
   !2017/08/?? - Increased integration routine speed
   !2017/09/27 - Added baryon models explicitly
+  !2018/01/18 - Added capacity for input CAMB linear P(k)
 
   !HMcode developed by Alexander Mead
   !If you use this in your work please cite the original paper: http://arxiv.org/abs/1505.07833
@@ -58,6 +62,18 @@ PROGRAM HMcode
   !0 - Non-verbose
   !1 - Verbose
   ihm=1
+
+  CALL get_command_argument(1,infile)
+  IF(infile=='') THEN
+     itab=.FALSE.
+  ELSE
+     INQUIRE(file=infile,exist=lexist)
+     IF(lexist .EQV. .FALSE.) STOP 'This input file does not exist'
+     itab=.TRUE.
+     CALL get_command_argument(2,redshift)
+     IF(redshift=='') STOP 'You need to supply a redshift for the input P(k)'
+     READ(redshift,*) zin
+  END IF
  
   WRITE(*,*)
   WRITE(*,*) 'Welcome to HMcode'
@@ -94,17 +110,24 @@ PROGRAM HMcode
   ALLOCATE(ptab(nz,nk))
 
   !Assigns the cosmological model
-  CALL assign_cosmology(cosi)
+  CALL assign_cosmology(cosm)
+
+  !Read in linear P(k) if provided
+  IF(itab) THEN
+     CALL read_CAMB_Pk(cosm%k_plin,cosm%plin,cosm%nk,infile)
+     cosm%itab=.TRUE. !Change this variable to true
+     cosm%pkz=zin
+  END IF
 
   !Normalises power spectrum (via sigma_8) and fills sigma(R) look-up tables
-  CALL initialise_cosmology(cosi)
+  CALL initialise_cosmology(cosm)
 
 !!$  !Ignore this, useful only for bug tests
 !!$  CALL RNG_set(0)
 !!$  DO l=1,20
-!!$  CALL random_cosmology(cosi)
+!!$  CALL random_cosmology(cosm)
 
-  CALL write_cosmology(cosi)
+  CALL write_cosmology(cosm)
 
   !Loop over redshifts
   DO j=1,nz
@@ -113,14 +136,14 @@ PROGRAM HMcode
      z=ztab(j)
 
      !Initiliasation for the halomodel calcualtion
-     CALL halomod_init(z,lut,cosi)
+     CALL halomod_init(z,lut,cosm)
 
      !Loop over k values
      DO i=1,SIZE(k)
 
-        plin=p_lin(k(i),z,cosi)
+        plin=p_lin(k(i),z,cosm)
 
-        CALL halomod(k(i),z,p1h,p2h,pfull,plin,lut,cosi)
+        CALL halomod(k(i),z,p1h,p2h,pfull,plin,lut,cosm)
 
         ptab(j,i)=pfull
 
@@ -135,12 +158,12 @@ PROGRAM HMcode
   END DO
   WRITE(*,*)
 
-  output='power.dat'
-  WRITE(*,fmt='(A19,A10)') 'Writing output to:', TRIM(output)
+  outfile='power.dat'
+  WRITE(*,fmt='(A19,A10)') 'Writing output to:', TRIM(outfile)
   WRITE(*,*)
   WRITE(*,*) 'The top row of the file contains the redshifts (the first entry is hashes - #####)'
   WRITE(*,*) 'Subsequent rows contain ''k'' and then the halo-model power for each redshift'
-  OPEN(7,file=output)
+  OPEN(7,file=outfile)
   DO i=0,nk
      IF(i==0) THEN
         WRITE(7,fmt='(A20,40F20.10)') '#####', (ztab(j), j=1,nz)
@@ -156,6 +179,38 @@ PROGRAM HMcode
 !!$  END DO
 
 CONTAINS
+
+  SUBROUTINE read_CAMB_Pk(k,p,n,infile)
+
+    USE file_info
+    IMPLICIT NONE
+    CHARACTER(len=256), INTENT(IN) :: infile
+    REAL, ALLOCATABLE, INTENT(OUT) :: k(:), p(:)
+    INTEGER, INTENT(OUT) :: n
+    INTEGER :: i
+    
+    n=file_length(infile)
+    n=n-1
+    WRITE(*,*) 'READ_CAMB_PK: CAMB file: ', TRIM(infile)
+    WRITE(*,*) 'READ_CAMB_PK: Number of points:', n
+    WRITE(*,*)
+
+    ALLOCATE(k(n),p(n))
+
+    OPEN(7,file=infile)
+    DO i=0,n
+       IF(i==0) THEN
+          READ(7,*)
+       ELSE
+          READ(7,*) k(i), p(i)
+       END IF
+    END DO
+    CLOSE(7)
+
+    !Convert from P(k) -> Delta^2(k)
+    p=4.*pi*p*(k**3)/(2.*pi)**3
+
+  END SUBROUTINE read_CAMB_Pk
 
   FUNCTION Delta_v(z,cosm)
 
@@ -437,7 +492,11 @@ CONTAINS
 
     !Assigns the cosmological parameters - edit this to change cosmology
     IMPLICIT NONE
-    TYPE(cosmology) :: cosm
+    !LOGICAL, INTENT(IN) :: itab
+    TYPE(cosmology), INTENT(OUT) :: cosm
+
+    !Read in linear P(k) or not
+    cosm%itab=.FALSE.
 
     !Standard cosmological parameters
     cosm%om_m=0.3
@@ -473,22 +532,38 @@ CONTAINS
 
     CALL fill_growtab(cosm)
 
-    cosm%A=1.
+    IF(cosm%itab) THEN
 
-    sigi=sigma(8.,0.,cosm)
+       !'Grow' the input power to z=0
+       IF(ihm==1) WRITE(*,*) 'INITIALISE: Growing input P(k) to z=0'
+       cosm%plin=cosm%plin*(grow(0.,cosm)/grow(cosm%pkz,cosm))**2
+       IF(ihm==1) WRITE(*,*) 'INITIALISE: Done'
+       IF(ihm==1) WRITE(*,*)
 
-    IF(ihm==1) WRITE(*,*) 'INITIALISE: Initial sigma_8:', sigi
+    ELSE
 
-    cosm%A=cosm%sig8/sigi    
+       !Initially set amplitude: A=1
+       cosm%A=1.
 
-    sigi=sigma(8.,0.,cosm)
+       !Calculate sigma_8 under the assumption of A=1
+       sigi=sigma(8.,0.,cosm)
 
-    IF(ihm==1) THEN
-       WRITE(*,*) 'INITIALISE: Normalisation factor:', cosm%A
-       WRITE(*,*) 'INITIALISE: Target sigma_8:', cosm%sig8
-       WRITE(*,*) 'INITIALISE: Final sigma_8 (calculated):', sigi
-       WRITE(*,*) 'INITIALISE: Complete'
-       WRITE(*,*)
+       IF(ihm==1) WRITE(*,*) 'INITIALISE: Initial sigma_8:', sigi
+
+       !Change the amplitude to ensure that the power will be normalised correctly at z=0
+       cosm%A=cosm%sig8/sigi    
+
+       !Check that the normalisation is correct
+       sigi=sigma(8.,0.,cosm)
+
+       IF(ihm==1) THEN
+          WRITE(*,*) 'INITIALISE: Normalisation factor:', cosm%A
+          WRITE(*,*) 'INITIALISE: Target sigma_8:', cosm%sig8
+          WRITE(*,*) 'INITIALISE: Final sigma_8 (calculated):', sigi
+          WRITE(*,*) 'INITIALISE: Complete'
+          WRITE(*,*)
+       END IF 
+
     END IF
 
     !Fill tables of r vs. sigma(r)
@@ -961,9 +1036,12 @@ CONTAINS
        !Avoids some issues if p_lin is called for very (absurdly) high k values
        !For some reason crashes can occur if this is the case
        p_lin=0.
+    ELSE IF(cosm%itab) THEN
+       !Get the linear power from the table, using interpolation
+       p_lin=(grow(z,cosm)**2)*exp(find(log(k),log(cosm%k_plin),log(cosm%plin),cosm%nk,3,3,2))
     ELSE
        !In this case look for the transfer function
-       p_lin=(cosm%A**2.)*(grow(z,cosm)**2.)*(Tk(k,cosm)**2.)*(k**(cosm%n+3.))
+       p_lin=(cosm%A**2)*(grow(z,cosm)**2)*(Tk(k,cosm)**2)*(k**(cosm%n+3.))
     END IF
 
   END FUNCTION p_lin
@@ -2780,12 +2858,13 @@ CONTAINS
     norm=find(1.,a_tab,d_tab,SIZE(a_tab),3,3,2)
     IF(ihm==1) WRITE(*,*) 'GROWTH: unnormalised g(a=1):', norm
     d_tab=d_tab/norm
-    IF(ihm==1) WRITE(*,*)
 
     !This downsamples the tables that come out of the ODE solver (which can be a bit long)
     !Could use some table-interpolation routine here to save time
     IF(ALLOCATED(cosm%a_growth)) DEALLOCATE(cosm%a_growth,cosm%growth)
     cosm%ng=n
+
+    IF(ihm==1) WRITE(*,*) 'GROWTH: Entries in table:', n
 
     ALLOCATE(cosm%a_growth(n),cosm%growth(n))
     DO i=1,n
@@ -2793,6 +2872,9 @@ CONTAINS
        cosm%a_growth(i)=a
        cosm%growth(i)=find(a,a_tab,d_tab,SIZE(a_tab),3,3,2)
     END DO
+
+    IF(ihm==1) WRITE(*,*) 'GROWTH: Done'
+    IF(ihm==1) WRITE(*,*)
 
   END SUBROUTINE fill_growtab
 
