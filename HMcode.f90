@@ -124,7 +124,7 @@ PROGRAM HMcode
 
 !!$  !Ignore this, useful only for bug tests
 !!$  CALL RNG_set(0)
-!!$  DO l=1,20
+!!$  DO
 !!$  CALL random_cosmology(cosm)
 
   CALL write_cosmology(cosm)
@@ -537,6 +537,8 @@ CONTAINS
        !'Grow' the input power to z=0
        IF(ihm==1) WRITE(*,*) 'INITIALISE: Growing input P(k) to z=0'
        cosm%plin=cosm%plin*(grow(0.,cosm)/grow(cosm%pkz,cosm))**2
+       cosm%plin=log(cosm%plin)
+       cosm%k_plin=log(cosm%k_plin)
        IF(ihm==1) WRITE(*,*) 'INITIALISE: Done'
        IF(ihm==1) WRITE(*,*)
 
@@ -615,7 +617,7 @@ CONTAINS
 !!$    cosm%sig8=uniform(sig8_min,sig8_max)
 !!$
 !!$  END SUBROUTINE random_cosmology
-
+!!$
 !!$  SUBROUTINE RNG_set(seed)
 !!$
 !!$    !Seeds the RNG using the system clock so that it is different each time
@@ -1038,7 +1040,7 @@ CONTAINS
        p_lin=0.
     ELSE IF(cosm%itab) THEN
        !Get the linear power from the table, using interpolation
-       p_lin=(grow(z,cosm)**2)*exp(find(log(k),log(cosm%k_plin),log(cosm%plin),cosm%nk,3,3,2))
+       p_lin=(grow(z,cosm)**2)*exp(find(log(k),cosm%k_plin,cosm%plin,cosm%nk,3,3,2))
     ELSE
        !In this case look for the transfer function
        p_lin=(cosm%A**2)*(grow(z,cosm)**2)*(Tk(k,cosm)**2)*(k**(cosm%n+3.))
@@ -1056,6 +1058,11 @@ CONTAINS
     TYPE(tables), INTENT(IN) :: lut
     TYPE(cosmology), INTENT(IN) :: cosm
     REAL :: sigv, frac
+    REAL :: crap
+
+    !Stop compile-time warnings
+    crap=z
+    crap=cosm%A
 
     sigv=lut%sigv
     frac=fdamp(lut)
@@ -1165,8 +1172,8 @@ CONTAINS
     !Must be allocated after the sigtab calulation above
     ALLOCATE(cosm%r_sigma(nsig),cosm%sigma(nsig))
 
-    cosm%r_sigma=rtab
-    cosm%sigma=sigtab
+    cosm%r_sigma=log(rtab)
+    cosm%sigma=log(sigtab)
 
     DEALLOCATE(rtab,sigtab)
 
@@ -1185,7 +1192,7 @@ CONTAINS
     REAL, INTENT(IN) :: r, z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    sigma_cb=grow(z,cosm)*exp(find(log(r),log(cosm%r_sigma),log(cosm%sigma),cosm%nsig,3,3,2))
+    sigma_cb=grow(z,cosm)*exp(find(log(r),cosm%r_sigma,cosm%sigma,cosm%nsig,3,3,2))
 
   END FUNCTION sigma_cb
 
@@ -1431,6 +1438,9 @@ CONTAINS
 
        !Reset the sum variable for the integration
        sum_2n=0.d0
+       sum_n=0.d0
+       sum_new=0.d0
+       sum_old=0.d0
 
        DO j=1,jmax
           
@@ -1474,7 +1484,6 @@ CONTAINS
 
           IF((j>=jmin) .AND. (ABS(-1.d0+sum_new/sum_old)<acc)) THEN
              !jmin avoids spurious early convergence
-             sigint0=REAL(sum_new)
              EXIT
           ELSE IF(j==jmax) THEN
              STOP 'SIGINT0: Integration timed out'
@@ -1486,6 +1495,8 @@ CONTAINS
           END IF
 
        END DO
+
+       sigint0=REAL(sum_new)
 
     END IF
 
@@ -1545,6 +1556,9 @@ CONTAINS
 
        !Reset the sum variable for the integration
        sum_2n=0.d0
+       sum_n=0.d0
+       sum_new=0.d0
+       sum_old=0.d0
 
        DO j=1,jmax
           
@@ -1587,8 +1601,7 @@ CONTAINS
           END IF
 
           IF((j>=jmin) .AND. (ABS(-1.d0+sum_new/sum_old)<acc)) THEN
-             !jmin avoids spurious early convergence
-             sigint1=REAL(sum_new)
+             !jmin avoids spurious early convergence             
              EXIT
           ELSE IF(j==jmax) THEN
              STOP 'SIGINT1: Integration timed out'
@@ -1600,6 +1613,8 @@ CONTAINS
           END IF
 
        END DO
+
+       sigint1=REAL(sum_new)
 
     END IF
 
@@ -1650,6 +1665,9 @@ CONTAINS
 
        !Reset the sum variable for the integration
        sum_2n=0.d0
+       sum_n=0.d0
+       sum_new=0.d0
+       sum_old=0.d0
 
        DO j=1,jmax
           
@@ -1693,7 +1711,6 @@ CONTAINS
 
           IF((j>=jmin) .AND. (ABS(-1.d0+sum_new/sum_old)<acc)) THEN
              !jmin avoids spurious early convergence
-             sigint2=REAL(sum_new)
              !WRITE(*,*) 'INTEGRATE_STORE: Nint:', n
              EXIT
           ELSE IF(j==jmax) THEN
@@ -1706,6 +1723,8 @@ CONTAINS
           END IF
 
        END DO
+
+       sigint2=REAL(sum_new)
 
     END IF
 
@@ -1855,6 +1874,9 @@ CONTAINS
 
        !Reset the sum variable for the integration
        sum_2n=0.d0
+       sum_n=0.d0
+       sum_new=0.d0
+       sum_old=0.d0
 
        DO j=1,jmax
           
@@ -1898,7 +1920,6 @@ CONTAINS
 
           IF((j>=jmin) .AND. (ABS(-1.d0+sum_new/sum_old)<acc)) THEN
              !jmin avoids spurious early convergence
-             growint=REAL(exp(sum_new))
              EXIT
           ELSE IF(j==jmax) THEN
              STOP 'GROWINT: Integration timed out'
@@ -1910,6 +1931,8 @@ CONTAINS
           END IF
 
        END DO
+
+       growint=REAL(exp(sum_new))
 
     END IF
 
@@ -1970,6 +1993,9 @@ CONTAINS
 
        !Reset the sum variable for the integration
        sum_2n=0.d0
+       sum_n=0.d0
+       sum_new=0.d0
+       sum_old=0.d0
 
        DO j=1,jmax
           
@@ -2013,7 +2039,6 @@ CONTAINS
 
           IF((j>=jmin) .AND. (ABS(-1.d0+sum_new/sum_old)<acc)) THEN
              !jmin avoids spurious early convergence
-             dispint=REAL(sum_new)
              EXIT
           ELSE IF(j==jmax) THEN
              STOP 'DISPINT: Integration timed out'
@@ -2025,6 +2050,8 @@ CONTAINS
           END IF
 
        END DO
+
+       dispint=REAL(sum_new)
 
     END IF
 
@@ -3027,7 +3054,10 @@ CONTAINS
     REAL :: fv
     REAL, INTENT(IN) :: d, v, k, a
     REAL :: f1, f2, z
-    TYPE(cosmology), INTENT(IN) :: cosm   
+    TYPE(cosmology), INTENT(IN) :: cosm
+    REAL :: crap
+
+    crap=k !Stop compile-time warnings
 
     z=-1.+(1./a)
 
@@ -3046,6 +3076,13 @@ CONTAINS
     REAL :: fd
     REAL, INTENT(IN) :: d, v, k, a
     TYPE(cosmology), INTENT(IN) :: cosm
+    REAL :: crap
+
+    !Stop compile-time warnings
+    crap=a
+    crap=cosm%A
+    crap=d
+    crap=k
 
     fd=v
 
