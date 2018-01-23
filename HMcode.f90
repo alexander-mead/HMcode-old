@@ -5,9 +5,9 @@ MODULE cosdef
      REAL :: om_m, om_b, om_v, om_c, h, n, sig8, w, wa
      REAL :: A, pkz
      REAL :: eta0, Abary
-     REAL, ALLOCATABLE :: k_plin(:), Plin(:)
+     REAL, ALLOCATABLE :: k_plin(:), plin(:)
      REAL, ALLOCATABLE :: r_sigma(:), sigma(:)
-     REAL, ALLOCATABLE :: a_growth(:), growth(:)
+     REAL, ALLOCATABLE :: a_grow(:), grow(:)
      INTEGER :: nsig, ng, nk
      LOGICAL :: itab
   END TYPE cosmology
@@ -848,8 +848,8 @@ CONTAINS
 
        !Make a LCDM cosmology
        cos_lcdm=cosm
-       DEALLOCATE(cos_lcdm%growth)
-       DEALLOCATE(cos_lcdm%a_growth)
+       DEALLOCATE(cos_lcdm%grow)
+       DEALLOCATE(cos_lcdm%a_grow)
        cos_lcdm%w=-1.
        cos_lcdm%wa=0.
        cos_lcdm%om_v=1.-cosm%om_m !Added this so that 'making a LCDM cosmology' works for curved models.
@@ -881,11 +881,11 @@ CONTAINS
     REAL, ALLOCATABLE :: af_tab(:), grow_tab(:)
     INTEGER :: i, ntab      
 
-    ntab=SIZE(cosm%growth)
+    ntab=SIZE(cosm%grow)
     ALLOCATE(af_tab(ntab),grow_tab(ntab))
 
-    af_tab=cosm%a_growth
-    grow_tab=cosm%growth
+    af_tab=cosm%a_grow
+    grow_tab=cosm%grow
 
     !Do numerical inversion
     DO i=1,lut%n
@@ -1840,7 +1840,7 @@ CONTAINS
        grow=1.
     ELSE
        a=1./(1.+z)
-       grow=find(a,cosm%a_growth,cosm%growth,cosm%ng,3,3,2)
+       grow=find(a,cosm%a_grow,cosm%grow,cosm%ng,3,3,2)
     END IF
 
   END FUNCTION grow
@@ -2891,16 +2891,16 @@ CONTAINS
 
     !This downsamples the tables that come out of the ODE solver (which can be a bit long)
     !Could use some table-interpolation routine here to save time
-    IF(ALLOCATED(cosm%a_growth)) DEALLOCATE(cosm%a_growth,cosm%growth)
+    IF(ALLOCATED(cosm%a_grow)) DEALLOCATE(cosm%a_grow,cosm%grow)
     cosm%ng=n
 
     IF(ihm==1) WRITE(*,*) 'GROWTH: Entries in table:', n
 
-    ALLOCATE(cosm%a_growth(n),cosm%growth(n))
+    ALLOCATE(cosm%a_grow(n),cosm%grow(n))
     DO i=1,n
        a=ainit+(amax-ainit)*float(i-1)/float(n-1)
-       cosm%a_growth(i)=a
-       cosm%growth(i)=find(a,a_tab,d_tab,SIZE(a_tab),3,3,2)
+       cosm%a_grow(i)=a
+       cosm%grow(i)=find(a,a_tab,d_tab,SIZE(a_tab),3,3,2)
     END DO
 
     IF(ihm==1) WRITE(*,*) 'GROWTH: Done'
