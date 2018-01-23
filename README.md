@@ -31,17 +31,17 @@ HMcode is now also integrated within CAMB (https://github.com/cmbant/CAMB), and 
 Alexander Mead
 (mead@phas.ubc.ca)
 
-UPDATE: July 7th, 2015
+UPDATE: 2015/07/07
 One user reported crashes that occured for quite extreme cosmological models (n_s < 0.5, sig8 < 0.3 z>5). I have fixed this rather crudely by adding IF statements that catch problems (which manifest themsevles as extreme parameter values). The physical reason for these problems is that models with these odd cosmological parameters have R_nl<<1 Mpc and so have very few haloes. Some of the routines I was using previously had assumed that R_nl would not be so tiny.
 
-UPDATE: January 23rd, 2016
+UPDATE: 2016/01/23
 Updated the code a little so that it no longer calculates a range in nu and simply converts a mass range into a nu range to do the integral. The mass range is fixed from haloes of 1 Solar mass to 10^16 Solar masses, it is difficult to imagine an application of this code where this halo mass range would not be sufficient. This further helps when considering strange cosmological models at high redshift that suffer from a lack of haloes, for these models doing a nu to M inversion occasionally reached incredibly tiny halo masses that contribute negligbly to the power spectrum on cosmological scales due to their tiny sizes.
 
-UPDATE: February 4th, 2016
+UPDATE: 2016/02/04
 Included updates from Mead et al. (2016) including parameterising the two-halo damping term in terms of f(sigma_v) and slightly recalibrated values of alpha and f_damp. Now works for w(a)CDM models, where w(a)=w_0+(1.-a)*w_a.
 
-UPDATE: August 2nd, 2016
+UPDATE: 2016/08/02
 Small update to the README and some very minor fixes in the code to facilitate direct comparisons with other halomodel power codes.
 
-UPDATE: January 18th, 2018
+UPDATE: 2018/01/18
 Added support for an input linear spectrum from CAMB. This can be input via the command line as described above.
