@@ -182,7 +182,6 @@ CONTAINS
 
   SUBROUTINE read_CAMB_Pk(k,p,n,infile)
 
-    USE file_info
     IMPLICIT NONE
     CHARACTER(len=256), INTENT(IN) :: infile
     REAL, ALLOCATABLE, INTENT(OUT) :: k(:), p(:)
