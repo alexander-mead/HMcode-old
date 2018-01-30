@@ -79,8 +79,8 @@ PROGRAM HMcode
   WRITE(*,*) 'Welcome to HMcode'
   WRITE(*,*) '================='
   WRITE(*,*)
-  IF(imead==0) WRITE(*,*) 'Doing standard calculation'
-  IF(imead==1) WRITE(*,*) 'Doing accurate calculation'
+  IF(imead==0) WRITE(*,*) 'HMcode: Doing standard calculation'
+  IF(imead==1) WRITE(*,*) 'HMcode: Doing accurate calculation'
   WRITE(*,*)
 
   !Set number of k points and k range (log spaced)
@@ -90,9 +90,9 @@ PROGRAM HMcode
   CALL fill_table(log(kmin),log(kmax),k,nk)
   k=exp(k)
 
-  WRITE(*,*) 'k min:', kmin
-  WRITE(*,*) 'k max:', kmax
-  WRITE(*,*) 'number of k:', nk
+  WRITE(*,*) 'HMcode: k min:', kmin
+  WRITE(*,*) 'HMcode: k max:', kmax
+  WRITE(*,*) 'HMcode: number of k:', nk
   WRITE(*,*)
 
   !Set the number of redshifts and range (linearly spaced)
@@ -101,9 +101,9 @@ PROGRAM HMcode
   zmax=4.
   CALL fill_table(zmin,zmax,ztab,nz)
 
-  WRITE(*,*) 'z min:', zmin
-  WRITE(*,*) 'z max:', zmax
-  WRITE(*,*) 'number of z:', nz
+  WRITE(*,*) 'HMcode: z min:', zmin
+  WRITE(*,*) 'HMcode: z max:', zmax
+  WRITE(*,*) 'HMcode: number of z:', nz
   WRITE(*,*)
 
   !Fill table for output power
@@ -156,13 +156,15 @@ PROGRAM HMcode
      WRITE(*,fmt='(I5,F8.3)') j, ztab(j)
 
   END DO
+  WRITE(*,fmt='(A13)') '   ============'
   WRITE(*,*)
 
   outfile='power.dat'
-  WRITE(*,fmt='(A19,A10)') 'Writing output to:', TRIM(outfile)
-  WRITE(*,*)
-  WRITE(*,*) 'The top row of the file contains the redshifts (the first entry is hashes - #####)'
-  WRITE(*,*) 'Subsequent rows contain ''k'' and then the halo-model power for each redshift'
+  WRITE(*,*) 'HMcode: Writing output to: ', TRIM(outfile)
+  WRITE(*,*) 'HMcode: The first entry in the file is hashes - #####'
+  WRITE(*,*) 'HMcode: The remainder of the top row contains the redshifts'
+  WRITE(*,*) 'HMcode: The first column containts ''k'' after the hashes'
+  WRITE(*,*) 'HMcode: The rows then contain the power at that ''k'' for each redshift'
   OPEN(7,file=outfile)
   DO i=0,nk
      IF(i==0) THEN
@@ -172,7 +174,7 @@ PROGRAM HMcode
      END IF
   END DO
   CLOSE(7)
-  WRITE(*,*) 'Done'
+  WRITE(*,*) 'HMcode: Done'
   WRITE(*,*)
 
 !!$  !Ignore this, only useful for bug tests
@@ -362,8 +364,8 @@ CONTAINS
     TYPE(cosmology), INTENT(IN) :: cosm
     TYPE(tables), INTENT(IN) :: lut    
 
-    WRITE(*,*) 'Parameters at your redshift'
-    WRITE(*,*) '==========================='
+    WRITE(*,*) 'HMcode: Parameters'
+    WRITE(*,*) '==================='
     WRITE(*,fmt='(A10,F10.5)') 'z:', z
     WRITE(*,fmt='(A10,F10.5)') 'Dv:', Delta_v(z,cosm)
     WRITE(*,fmt='(A10,F10.5)') 'dc:', delta_c(z,cosm)
@@ -372,6 +374,7 @@ CONTAINS
     WRITE(*,fmt='(A10,F10.5)') 'A:', As(cosm)
     WRITE(*,fmt='(A10,F10.5)') 'fdamp:', fdamp(lut)
     WRITE(*,fmt='(A10,F10.5)') 'alpha:', alpha(lut)
+    WRITE(*,*) '==================='
     WRITE(*,*)
 
   END SUBROUTINE write_parameters
