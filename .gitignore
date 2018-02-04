@@ -9,3 +9,4 @@ warm/
 BACKUP/
 OLD/
 .gitignore~
+*.txt
