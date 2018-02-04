@@ -16,6 +16,7 @@ MODULE cosdef
      !Stuff that needs to be recalculated for each new z
      REAL, ALLOCATABLE :: c(:), rv(:), nu(:), sig(:), zc(:), m(:), rr(:), sigf(:)
      REAL :: sigv, sigv100, c3, knl, rnl, neff, sig8z
+     REAL :: gmin, gmax, gbmin, gbmax
      INTEGER :: n
   END TYPE tables
 
@@ -29,7 +30,7 @@ PROGRAM HMcode
   REAL :: p1h, p2h, pfull, plin
   REAL, ALLOCATABLE :: k(:), ztab(:), ptab(:,:)
   INTEGER :: i, j, nk, nz
-  INTEGER :: ihm
+  LOGICAL :: verbose
   REAL :: kmin, kmax, zmin, zmax, zin
   TYPE(cosmology) :: cosm
   TYPE(tables) :: lut
@@ -39,10 +40,14 @@ PROGRAM HMcode
   !Constants
   REAL, PARAMETER :: pi=3.141592654
 
+  !Accuracy parameter
+  REAL, PARAMETER :: acc=1e-4
+
   !imead parameter
-  !0 - Do the standard halo model calculation (Dv=200, dc=1.686, Sheth & Tormen (1999) mass function, Bullock (2001) c(M)'
+  !0 - Standard halo-model calculation (Dv=200, dc=1.686) with linear two-halo term'
   !1 - Do the accurate calculation detailed in Mead et al. (2015; 1505.07833) with updates from Mead et al. (2016; 1602.02154)
-  INTEGER, PARAMETER :: imead=1
+  !2 - Standard halo-model calculation (Dv=200, dc=1.686) with full two-halo term'
+  INTEGER, PARAMETER :: imead=2
   
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -52,16 +57,15 @@ PROGRAM HMcode
   !2017/08/?? - Increased integration routine speed
   !2017/09/27 - Added baryon models explicitly
   !2018/01/18 - Added capacity for input CAMB linear P(k)
+  !2018/02/?? - Added two-halo bias integral
 
   !HMcode developed by Alexander Mead
   !If you use this in your work please cite the original paper: http://arxiv.org/abs/1505.07833
   !Also maybe cite the update: http://arxiv.org/abs/1602.02154
   !Also consider citing the source code at ASCL: http://ascl.net/1508.001
 
-  !ihm variable (cannot be parameter because value is changed in code)
-  !0 - Non-verbose
-  !1 - Verbose
-  ihm=1
+  !verbose variable (cannot be parameter because value is changed in code)
+  verbose=.TRUE.
 
   CALL get_command_argument(1,infile)
   IF(infile=='') THEN
@@ -79,8 +83,15 @@ PROGRAM HMcode
   WRITE(*,*) 'Welcome to HMcode'
   WRITE(*,*) '================='
   WRITE(*,*)
-  IF(imead==0) WRITE(*,*) 'HMcode: Doing standard calculation'
-  IF(imead==1) WRITE(*,*) 'HMcode: Doing accurate calculation'
+  IF(imead==0) THEN
+     WRITE(*,*) 'HMcode: Doing standard calculation with linear two-halo term'
+  ELSE IF(imead==1) THEN
+     WRITE(*,*) 'HMcode: Doing accurate calculation'
+  ELSE IF(imead==2) THEN
+     WRITE(*,*) 'HMcode: Doing standard calculation with full two-halo term'
+  ELSE
+     STOP 'HMcode: Error, imead specified incorrectly'
+  END IF
   WRITE(*,*)
 
   !Set number of k points and k range (log spaced)
@@ -139,7 +150,7 @@ PROGRAM HMcode
      CALL halomod_init(z,lut,cosm)
 
      !Loop over k values
-     DO i=1,SIZE(k)
+     DO i=1,nk
 
         plin=p_lin(k(i),z,cosm)
 
@@ -221,7 +232,7 @@ CONTAINS
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    IF(imead==0) THEN
+    IF(imead==0 .OR. imead==2) THEN
        Delta_v=200.
     ELSE IF(imead==1) THEN
        Delta_v=418.*(omega_m(z,cosm)**(-0.352))
@@ -239,7 +250,7 @@ CONTAINS
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    IF(imead==0) THEN
+    IF(imead==0 .OR. imead==2) THEN
        delta_c=1.686
     ELSE IF(imead==1) THEN
        delta_c=1.59+0.0314*log(sigma_cb(8.,z,cosm))
@@ -259,7 +270,7 @@ CONTAINS
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    IF(imead==0) THEN
+    IF(imead==0 .OR. imead==2) THEN
        eta=0.
     ELSE IF(imead==1) THEN
        !The first parameter here is 'eta_0' in Mead et al. (2015; arXiv 1505.07833)
@@ -278,7 +289,7 @@ CONTAINS
     !TYPE(cosmology), INTENT(IN) :: cosm
     TYPE(tables), INTENT(IN) :: lut
 
-    IF(imead==0) THEN
+    IF(imead==0 .OR. imead==2) THEN
        !Set to zero for the standard Poisson one-halo term
        kstar=0.
     ELSE IF(imead==1) THEN
@@ -297,7 +308,7 @@ CONTAINS
     TYPE(cosmology), INTENT(IN) :: cosm
 
     !Halo concentration pre-factor
-    IF(imead==0) THEN
+    IF(imead==0 .OR. imead==2) THEN
        !Set to 4 for the standard Bullock value
        As=4.
     ELSE IF(imead==1) THEN
@@ -318,7 +329,7 @@ CONTAINS
     TYPE(tables), INTENT(IN) :: lut
 
     !Linear theory damping factor
-    IF(imead==0) THEN
+    IF(imead==0 .OR. imead==2) THEN
        !Set to 0 for the standard linear theory two halo term
        fdamp=0.
     ELSE IF(imead==1) THEN
@@ -339,7 +350,7 @@ CONTAINS
     REAL :: alpha
     TYPE(tables), INTENT(IN) :: lut
 
-    IF(imead==0) THEN
+    IF(imead==0 .OR. imead==2) THEN
        !Set to 1 for the standard halo model addition of one- and two-halo terms
        alpha=1.
     ELSE IF(imead==1) THEN
@@ -402,16 +413,30 @@ CONTAINS
     IMPLICIT NONE
     REAL, INTENT(OUT) :: p1h, p2h, pfull
     REAL, INTENT(IN) :: plin, k, z
-    REAL :: alp
     TYPE(cosmology), INTENT(IN) :: cosm
     TYPE(tables), INTENT(IN) :: lut
+    REAL :: alp, rv, c, nu, et
+    REAL :: wk(lut%n)
+    INTEGER :: i
 
     IF(k==0.) THEN
        p1h=0.
        p2h=0.
     ELSE
-       p1h=p_1h(k,z,lut,cosm)
-       p2h=p_2h(k,z,plin,lut,cosm)
+
+       !Only call eta once
+       et=eta(z,cosm)
+
+       DO i=1,lut%n
+          nu=lut%nu(i)
+          rv=lut%rv(i)
+          c=lut%c(i)
+          wk(i)=win(k*nu**et,rv,c)
+       END DO
+       
+       p1h=p_1h(wk,k,lut,cosm)
+       p2h=p_2h(wk,k,plin,lut,cosm)
+       
     END IF
 
     alp=alpha(lut)
@@ -475,7 +500,7 @@ CONTAINS
     IMPLICIT NONE
     TYPE(cosmology) :: cosm
 
-    IF(ihm==1) THEN
+    IF(verbose) THEN
        WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'Omega_m:', cosm%om_m
        WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'Omega_b:', cosm%om_b
        WRITE(*,fmt='(A11,A10,F10.5)') 'COSMOLOGY:', 'Omega_c:', cosm%om_c
@@ -537,15 +562,15 @@ CONTAINS
     IF(cosm%itab) THEN
 
        !'Grow' the input power to z=0
-       IF(ihm==1) WRITE(*,*) 'INITIALISE: Growing input P(k) to z=0'
+       IF(verbose) WRITE(*,*) 'INITIALISE: Growing input P(k) to z=0'
        cosm%plin=cosm%plin*(grow(0.,cosm)/grow(cosm%pkz,cosm))**2
        cosm%plin=log(cosm%plin)
        cosm%k_plin=log(cosm%k_plin)
        sigi=sigma(8.,0.,cosm)
        cosm%sig8=sigi
-       IF(ihm==1) WRITE(*,*) 'INITIALISE: sigma_8:', sigi
-       IF(ihm==1) WRITE(*,*) 'INITIALISE: Done'
-       IF(ihm==1) WRITE(*,*)
+       IF(verbose) WRITE(*,*) 'INITIALISE: sigma_8:', sigi
+       IF(verbose) WRITE(*,*) 'INITIALISE: Done'
+       IF(verbose) WRITE(*,*)
 
     ELSE
 
@@ -555,7 +580,7 @@ CONTAINS
        !Calculate sigma_8 under the assumption of A=1
        sigi=sigma(8.,0.,cosm)
 
-       IF(ihm==1) WRITE(*,*) 'INITIALISE: Initial sigma_8:', sigi
+       IF(verbose) WRITE(*,*) 'INITIALISE: Initial sigma_8:', sigi
 
        !Change the amplitude to ensure that the power will be normalised correctly at z=0
        cosm%A=cosm%sig8/sigi    
@@ -563,7 +588,7 @@ CONTAINS
        !Check that the normalisation is correct
        sigi=sigma(8.,0.,cosm)
 
-       IF(ihm==1) THEN
+       IF(verbose) THEN
           WRITE(*,*) 'INITIALISE: Normalisation factor:', cosm%A
           WRITE(*,*) 'INITIALISE: Target sigma_8:', cosm%sig8
           WRITE(*,*) 'INITIALISE: Final sigma_8 (calculated):', sigi
@@ -707,18 +732,20 @@ CONTAINS
     REAL, PARAMETER :: mmin=1e2 !Minimum mass for integration
     REAL, PARAMETER :: mmax=1e18 !Maximum mass for integration
     INTEGER, PARAMETER :: n=256 !Number of points for integration
+    REAL, PARAMETER :: large_nu=10. !A large value of nu(M)
     
     !Find value of sigma_v
     lut%sigv=sqrt(dispint(0.,z,cosm)/3.)
     lut%sigv100=sqrt(dispint(100.,z,cosm)/3.)
     lut%sig8z=sigma(8.,z,cosm)
 
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: Filling look-up tables'
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: Tables being filled at redshift:', z
-
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: sigv [Mpc/h]:', lut%sigv
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: sigv100 [Mpc/h]:', lut%sigv100
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: sig8(z):', lut%sig8z
+    IF(verbose) THEN
+       WRITE(*,*) 'HALOMOD: Filling look-up tables'
+       WRITE(*,*) 'HALOMOD: Tables being filled at redshift:', z
+       WRITE(*,*) 'HALOMOD: sigv [Mpc/h]:', lut%sigv
+       WRITE(*,*) 'HALOMOD: sigv100 [Mpc/h]:', lut%sigv100
+       WRITE(*,*) 'HALOMOD: sig8(z):', lut%sig8z
+    END IF
 
     IF(ALLOCATED(lut%rr)) CALL deallocate_LUT(lut)
 
@@ -741,7 +768,7 @@ CONTAINS
 
     END DO
 
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: m, r, nu, sig tables filled'
+    IF(verbose) WRITE(*,*) 'HALOMOD: m, r, nu, sig tables filled'
 
     !Fills up a table for sigma(fM) for Bullock c(m) relation
     !This is the f=0.01 parameter in the Bullock realtion sigma(fM,z)
@@ -749,41 +776,56 @@ CONTAINS
     DO i=1,lut%n
        lut%sigf(i)=sigma_cb(lut%rr(i)*f,z,cosm)
     END DO
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: sigf tables filled'  
+    IF(verbose) WRITE(*,*) 'HALOMOD: sigf tables filled'  
 
     !Fill virial radius table using real radius table
     Dv=Delta_v(z,cosm)
     lut%rv=lut%rr/(Dv**(1./3.))
 
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: rv tables filled'  
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: nu min:', lut%nu(1)
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: nu max:', lut%nu(lut%n)
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: R_v min [Mpc/h]:', lut%rv(1)
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: R_v max [Mpc/h]:', lut%rv(lut%n)
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: M min [Msun/h]:', lut%m(1)
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: M max [Msun/h]:', lut%m(lut%n)
+    IF(verbose) THEN
+       WRITE(*,*) 'HALOMOD: rv tables filled'  
+       WRITE(*,*) 'HALOMOD: nu min:', lut%nu(1)
+       WRITE(*,*) 'HALOMOD: nu max:', lut%nu(lut%n)
+       WRITE(*,*) 'HALOMOD: R_v min [Mpc/h]:', lut%rv(1)
+       WRITE(*,*) 'HALOMOD: R_v max [Mpc/h]:', lut%rv(lut%n)
+       WRITE(*,*) 'HALOMOD: M min [Msun/h]:', lut%m(1)
+       WRITE(*,*) 'HALOMOD: M max [Msun/h]:', lut%m(lut%n)
+    END IF
+
+    lut%gmin=1.-integrate(lut%nu(1),large_nu,gnu,acc,3)
+    lut%gmax=integrate(lut%nu(lut%n),large_nu,gnu,acc,3)
+    lut%gbmin=1.-integrate(lut%nu(1),large_nu,gnubnu,acc,3)
+    lut%gbmax=integrate(lut%nu(lut%n),large_nu,gnubnu,acc,3)
+    IF(verbose) THEN
+       WRITE(*,*) 'HALOMOD: missing g(nu) at low end:', REAL(lut%gmin)
+       WRITE(*,*) 'HALOMOD: missing g(nu) at high end:', REAL(lut%gmax)
+       WRITE(*,*) 'HALOMOD: missing g(nu)b(nu) at low end:', REAL(lut%gbmin)
+       WRITE(*,*) 'HALOMOD: missing g(nu)b(nu) at high end:', REAL(lut%gbmax)
+    END IF
 
     !Find non-linear radius and scale
     lut%rnl=r_nl(lut)
     lut%knl=1./lut%rnl
 
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: r_nl [Mpc/h]:', lut%rnl
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: k_nl [h/Mpc]:', lut%knl
+    IF(verbose) WRITE(*,*) 'HALOMOD: r_nl [Mpc/h]:', lut%rnl
+    IF(verbose) WRITE(*,*) 'HALOMOD: k_nl [h/Mpc]:', lut%knl
 
     lut%neff=neff(lut,cosm)
 
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: n_eff:', lut%neff
+    IF(verbose) WRITE(*,*) 'HALOMOD: n_eff:', lut%neff
 
     CALL conc_bull(z,cosm,lut)
 
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: c tables filled'
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: c min [Msun/h]:', lut%c(lut%n)
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: c max [Msun/h]:', lut%c(1)
-    IF(ihm==1) WRITE(*,*) 'HALOMOD: Done'
-    IF(ihm==1) WRITE(*,*)
-    IF(ihm==1) CALL write_parameters(z,lut,cosm)
+    IF(verbose) THEN
+       WRITE(*,*) 'HALOMOD: c tables filled'
+       WRITE(*,*) 'HALOMOD: c min:', lut%c(lut%n)
+       WRITE(*,*) 'HALOMOD: c max:', lut%c(1)
+       WRITE(*,*) 'HALOMOD: Done'
+       WRITE(*,*)
+       CALL write_parameters(z,lut,cosm)
+    END IF
 
-    ihm=0
+    verbose=.FALSE.
 
   END SUBROUTINE halomod_init
 
@@ -1053,64 +1095,145 @@ CONTAINS
 
   END FUNCTION p_lin
 
-  FUNCTION p_2h(k,z,plin,lut,cosm)
+  FUNCTION p_2h(wk,k,plin,lut,cosm)
 
     !Produces the 'two-halo' power
     IMPLICIT NONE
     REAL :: p_2h
-    REAL, INTENT(IN) :: k, plin
-    REAL, INTENT(IN) :: z
+    REAL, INTENT(IN) :: k, plin!, wk(lut%n)
     TYPE(tables), INTENT(IN) :: lut
     TYPE(cosmology), INTENT(IN) :: cosm
-    REAL :: sigv, frac
-    REAL :: crap
+    REAL, INTENT(IN) :: wk(lut%n)
+    REAL :: sigv, frac!, rhom
+    REAL, ALLOCATABLE :: integrand(:)
+    REAL :: nu, m, m0, w
+    REAL :: sum, crap
+    INTEGER :: i
+
+    INTEGER, PARAMETER :: ip2h=1
+
+    !rhom=comoving_matter_density(cosm)
 
     !Stop compile-time warnings
-    crap=z
     crap=cosm%A
 
-    sigv=lut%sigv
-    frac=fdamp(lut)
+    IF(imead==0 .OR. imead==2) THEN
 
-    IF(frac==0.) THEN
-       p_2h=plin
+       ALLOCATE(integrand(lut%n))
+
+       DO i=1,lut%n
+
+          m=lut%m(i)
+          nu=lut%nu(i)
+          w=wk(i)
+
+          !Linear bias term
+          integrand(i)=gnu(nu)*bnu(nu)*w!/m
+
+       END DO
+
+       !Evaluate these integrals from the tabled values
+       sum=integrate_table(lut%nu,integrand,lut%n,1,lut%n,3)
+
+       IF(ip2h==0) THEN
+          !Do nothing in this case
+       ELSE IF(ip2h==1) THEN
+          !Add on the value of integral b(nu)*g(nu) assuming w=1
+          sum=sum+lut%gbmin!*halo_fraction(ih(1),m,cosm)!/rhom
+          !sum12=sum12+lut%gbmin*halo_fraction(ih(2),m,cosm)!/rhom
+       ELSE IF(ip2h==2) THEN
+          !Put the missing part of the integrand as a delta function at nu1
+          m0=lut%m(1)
+          w=wk(1)
+          sum=sum+lut%gbmin*w
+       ELSE
+          STOP 'P_2h: Error, ip2h not specified correctly'
+       END IF
+
+       p_2h=plin*(sum**2)!*(rhom**2)
+
+    ELSE IF(imead==1) THEN
+
+       sigv=lut%sigv
+       frac=fdamp(lut)
+
+       IF(frac==0.) THEN
+          p_2h=plin
+       ELSE
+          p_2h=plin*(1.-frac*(tanh(k*sigv/sqrt(ABS(frac))))**2)
+       END IF
+
+       !For some extreme cosmologies frac>1. so this must be added to prevent p_2h<0.
+       IF(p_2h<0.) p_2h=0.
+
     ELSE
-       p_2h=plin*(1.-frac*(tanh(k*sigv/sqrt(ABS(frac))))**2.)
-    END IF
 
-    !For some extreme cosmologies frac>1. so this must be added to prevent p_2h<0.
-    IF(p_2h<0.) p_2h=0.
+       STOP 'P_2h: Error, imead specified incorrectly'
+
+    END IF
 
   END FUNCTION p_2h
 
-  FUNCTION p_1h(k,z,lut,cosm)
+!!$  FUNCTION p_2h(k,z,plin,lut,cosm)
+!!$
+!!$    !Produces the 'two-halo' power
+!!$    IMPLICIT NONE
+!!$    REAL :: p_2h
+!!$    REAL, INTENT(IN) :: k, plin
+!!$    REAL, INTENT(IN) :: z
+!!$    TYPE(tables), INTENT(IN) :: lut
+!!$    TYPE(cosmology), INTENT(IN) :: cosm
+!!$    REAL :: sigv, frac
+!!$    REAL :: crap
+!!$
+!!$    !Stop compile-time warnings
+!!$    crap=z
+!!$    crap=cosm%A
+!!$
+!!$    sigv=lut%sigv
+!!$    frac=fdamp(lut)
+!!$
+!!$    IF(frac==0.) THEN
+!!$       p_2h=plin
+!!$    ELSE
+!!$       p_2h=plin*(1.-frac*(tanh(k*sigv/sqrt(ABS(frac))))**2)
+!!$    END IF
+!!$
+!!$    !For some extreme cosmologies frac>1. so this must be added to prevent p_2h<0.
+!!$    IF(p_2h<0.) p_2h=0.
+!!$
+!!$  END FUNCTION p_2h
+
+  FUNCTION p_1h(wk,k,lut,cosm)
 
     !Does the one-halo power integral
     IMPLICIT NONE
     REAL :: p_1h
-    REAL, INTENT(IN) :: k, z
+    REAL, INTENT(IN) :: k
     TYPE(tables), INTENT(IN) :: lut
     TYPE(cosmology), INTENT(IN) :: cosm
-    REAL :: g, fac, et, ks, wk
+    REAL, INTENT(IN) :: wk(lut%n)
+    REAL :: g, fac, ks, w, m
     REAL, ALLOCATABLE :: integrand(:)
-    INTEGER :: i    
+    INTEGER :: i
 
     ALLOCATE(integrand(lut%n))
-    integrand=0.
 
     !Only call eta once
-    et=eta(z,cosm)
+    !et=eta(z,cosm)
 
     !Calculates the value of the integrand at all nu values!
     DO i=1,lut%n
        g=gnu(lut%nu(i))
-       wk=win(k*(lut%nu(i)**et),lut%rv(i),lut%c(i))
-       integrand(i)=lut%m(i)*g*(wk**2.)
+       m=lut%m(i)
+       !wk=win(k*(lut%nu(i)**et),lut%rv(i),lut%c(i))
+       w=wk(i)
+       integrand(i)=m*g*w**2
     END DO
 
     !Carries out the integration
     !Important to use basic trapezium rule because the integrand is messy
-    p_1h=inttab(lut%nu,REAL(integrand),lut%n,1)*(4.*pi)*(k**3.)/(cosmic_density(cosm)*(2.*pi)**3.)    
+    p_1h=integrate_table(lut%nu,REAL(integrand),lut%n,1,lut%n,1)*(4.*pi)*(k**3)/(cosmic_density(cosm)*(2.*pi)**3)    
 
     DEALLOCATE(integrand)
 
@@ -1119,10 +1242,10 @@ CONTAINS
 
     !Prevents problems if k/ks is very large
     IF(ks>0.) THEN
-       IF((k/ks)**2.>7.) THEN
+       IF((k/ks)**2>7.) THEN
           fac=0.
        ELSE
-          fac=exp(-((k/ks)**2.))
+          fac=exp(-((k/ks)**2))
        END IF
        p_1h=p_1h*(1.-fac)
     END IF
@@ -1155,10 +1278,10 @@ CONTAINS
     rmax=1e3
     cosm%nsig=nsig
 
-    IF(ihm==1) WRITE(*,*) 'SIGTAB: Filling sigma interpolation table'
-    IF(ihm==1) WRITE(*,*) 'SIGTAB: Rmin:', rmin
-    IF(ihm==1) WRITE(*,*) 'SIGTAB: Rmax:', rmax
-    IF(ihm==1) WRITE(*,*) 'SIGTAB: Values:', nsig
+    IF(verbose) WRITE(*,*) 'SIGTAB: Filling sigma interpolation table'
+    IF(verbose) WRITE(*,*) 'SIGTAB: Rmin:', rmin
+    IF(verbose) WRITE(*,*) 'SIGTAB: Rmax:', rmax
+    IF(verbose) WRITE(*,*) 'SIGTAB: Values:', nsig
 
     ALLOCATE(rtab(nsig),sigtab(nsig))
 
@@ -1182,8 +1305,8 @@ CONTAINS
 
     DEALLOCATE(rtab,sigtab)
 
-    IF(ihm==1) WRITE(*,*) 'SIGTAB: Done'
-    IF(ihm==1) WRITE(*,*)
+    IF(verbose) WRITE(*,*) 'SIGTAB: Done'
+    IF(verbose) WRITE(*,*)
 
   END SUBROUTINE fill_sigtab
 
@@ -1217,26 +1340,250 @@ CONTAINS
 
   END FUNCTION wk_tophat
 
-  FUNCTION inttab(x,y,n,iorder)
+!!$  FUNCTION inttab(x,y,n,iorder)
+!!$
+!!$    !Integrates tables y(x)dx
+!!$    IMPLICIT NONE
+!!$    REAL :: inttab
+!!$    INTEGER, INTENT(IN) :: n
+!!$    REAL, INTENT(IN) :: x(n), y(n)
+!!$    REAL :: a, b, c, d, h
+!!$    REAL :: q1, q2, q3, qi, qf
+!!$    REAL :: x1, x2, x3, x4, y1, y2, y3, y4, xi, xf
+!!$    REAL*8 :: sum
+!!$    INTEGER :: i, i1, i2, i3, i4
+!!$    INTEGER, INTENT(IN) :: iorder
+!!$
+!!$    sum=0.d0
+!!$
+!!$    IF(iorder==1) THEN
+!!$
+!!$       !Sums over all Trapezia (a+b)*h/2
+!!$       DO i=1,n-1
+!!$          a=y(i+1)
+!!$          b=y(i)
+!!$          h=x(i+1)-x(i)
+!!$          sum=sum+(a+b)*h/2.d0
+!!$       END DO
+!!$
+!!$    ELSE IF(iorder==2) THEN
+!!$
+!!$       DO i=1,n-2
+!!$
+!!$          x1=x(i)
+!!$          x2=x(i+1)
+!!$          x3=x(i+2)
+!!$
+!!$          y1=y(i)
+!!$          y2=y(i+1)
+!!$          y3=y(i+2)
+!!$
+!!$          CALL fit_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
+!!$
+!!$          q1=a*(x1**3.)/3.+b*(x1**2.)/2.+c*x1
+!!$          q2=a*(x2**3.)/3.+b*(x2**2.)/2.+c*x2
+!!$          q3=a*(x3**3.)/3.+b*(x3**2.)/2.+c*x3
+!!$
+!!$          !Takes value for first and last sections but averages over sections where you
+!!$          !have two independent estimates of the area
+!!$          IF(n==3) THEN
+!!$             sum=sum+q3-q1
+!!$          ELSE IF(i==1) THEN
+!!$             sum=sum+(q2-q1)+(q3-q2)/2.d0
+!!$          ELSE IF(i==n-2) THEN
+!!$             sum=sum+(q2-q1)/2.d0+(q3-q2)
+!!$          ELSE
+!!$             sum=sum+(q3-q1)/2.
+!!$          END IF
+!!$
+!!$       END DO
+!!$
+!!$    ELSE IF(iorder==3) THEN
+!!$
+!!$       DO i=1,n-1
+!!$
+!!$          !First choose the integers used for defining cubics for each section
+!!$          !First and last are different because the section does not lie in the *middle* of a cubic
+!!$
+!!$          IF(i==1) THEN
+!!$
+!!$             i1=1
+!!$             i2=2
+!!$             i3=3
+!!$             i4=4
+!!$
+!!$          ELSE IF(i==n-1) THEN
+!!$
+!!$             i1=n-3
+!!$             i2=n-2
+!!$             i3=n-1
+!!$             i4=n
+!!$
+!!$          ELSE
+!!$
+!!$             i1=i-1
+!!$             i2=i
+!!$             i3=i+1
+!!$             i4=i+2
+!!$
+!!$          END IF
+!!$
+!!$          x1=x(i1)
+!!$          x2=x(i2)
+!!$          x3=x(i3)
+!!$          x4=x(i4)
+!!$
+!!$          y1=y(i1)
+!!$          y2=y(i2)
+!!$          y3=y(i3)
+!!$          y4=y(i4)
+!!$
+!!$          CALL fit_cubic(a,b,c,d,x1,y1,x2,y2,x3,y3,x4,y4)
+!!$
+!!$          !These are the limits of the particular section of integral
+!!$          xi=x(i)
+!!$          xf=x(i+1)
+!!$
+!!$          qi=a*(xi**4.)/4.+b*(xi**3.)/3.+c*(xi**2.)/2.+d*xi
+!!$          qf=a*(xf**4.)/4.+b*(xf**3.)/3.+c*(xf**2.)/2.+d*xf
+!!$
+!!$          sum=sum+qf-qi
+!!$
+!!$       END DO
+!!$
+!!$    ELSE
+!!$
+!!$       STOP 'INTTAB: Error, order not specified correctly'
+!!$
+!!$    END IF
+!!$
+!!$    inttab=REAL(sum)
+!!$
+!!$  END FUNCTION inttab
+
+  FUNCTION integrate(a,b,f,acc,iorder)
+
+    !Integrates between a and b until desired accuracy is reached
+    !Stores information to reduce function calls
+    IMPLICIT NONE
+    REAL :: integrate
+    REAL, INTENT(IN) :: a, b, acc
+    INTEGER, INTENT(IN) :: iorder
+    INTEGER :: i, j
+    INTEGER :: n
+    REAL :: x, dx
+    REAL :: f1, f2, fx
+    DOUBLE PRECISION :: sum_n, sum_2n, sum_new, sum_old
+    INTEGER, PARAMETER :: jmin=5
+    INTEGER, PARAMETER :: jmax=30
+
+    INTERFACE
+       FUNCTION f(x)
+         REAL :: f
+         REAL, INTENT(IN) :: x
+       END FUNCTION f
+    END INTERFACE
+
+    IF(a==b) THEN
+
+       !Fix the answer to zero if the integration limits are identical
+       integrate=0.
+
+    ELSE
+
+       !Set the sum variable for the integration
+       sum_2n=0.d0
+       sum_n=0.d0
+       sum_old=0.d0
+       sum_new=0.d0
+
+       DO j=1,jmax
+          
+          !Note, you need this to be 1+2**n for some integer n
+          !j=1 n=2; j=2 n=3; j=3 n=5; j=4 n=9; ...'
+          n=1+2**(j-1)
+
+          !Calculate the dx interval for this value of 'n'
+          dx=(b-a)/REAL(n-1)
+
+          IF(j==1) THEN
+             
+             !The first go is just the trapezium of the end points
+             f1=f(a)
+             f2=f(b)
+             sum_2n=0.5d0*(f1+f2)*dx
+             sum_new=sum_2n
+             
+          ELSE
+
+             !Loop over only new even points to add these to the integral
+             DO i=2,n,2
+                x=a+(b-a)*REAL(i-1)/REAL(n-1)
+                fx=f(x)
+                sum_2n=sum_2n+fx
+             END DO
+
+             !Now create the total using the old and new parts
+             sum_2n=sum_n/2.d0+sum_2n*dx
+
+             !Now calculate the new sum depending on the integration order
+             IF(iorder==1) THEN  
+                sum_new=sum_2n
+             ELSE IF(iorder==3) THEN         
+                sum_new=(4.d0*sum_2n-sum_n)/3.d0 !This is Simpson's rule and cancels error
+             ELSE
+                STOP 'INTEGRATE: Error, iorder specified incorrectly'
+             END IF
+
+          END IF
+
+          IF((j>=jmin) .AND. (ABS(-1.d0+sum_new/sum_old)<acc)) THEN
+             !jmin avoids spurious early convergence
+             !integrate=REAL(sum_new)
+             !WRITE(*,*) 'INTEGRATE: Nint:', n
+             EXIT
+          ELSE IF(j==jmax) THEN
+             STOP 'INTEGRATE: Integration timed out'
+          ELSE
+             !Integral has not converged so store old sums and reset sum variables
+             sum_old=sum_new
+             sum_n=sum_2n
+             sum_2n=0.d0
+          END IF
+
+       END DO
+
+       integrate=REAL(sum_new)
+
+    END IF
+
+  END FUNCTION integrate
+
+  FUNCTION integrate_table(x,y,n,n1,n2,iorder)
+
+    USE fix_polynomial
 
     !Integrates tables y(x)dx
     IMPLICIT NONE
-    REAL :: inttab
-    INTEGER, INTENT(IN) :: n
+    REAL :: integrate_table
+    INTEGER, INTENT(IN) :: n, n1, n2
     REAL, INTENT(IN) :: x(n), y(n)
     REAL :: a, b, c, d, h
     REAL :: q1, q2, q3, qi, qf
     REAL :: x1, x2, x3, x4, y1, y2, y3, y4, xi, xf
-    REAL*8 :: sum
+    DOUBLE PRECISION :: sum
     INTEGER :: i, i1, i2, i3, i4
     INTEGER, INTENT(IN) :: iorder
 
     sum=0.d0
 
+    !I think if n1=n2 then the result will just be zero anyway
+    !IF(n2<=n1) STOP 'INTEGRATE_TABLE: Error n2 must be greater than n1'
+
     IF(iorder==1) THEN
 
        !Sums over all Trapezia (a+b)*h/2
-       DO i=1,n-1
+       DO i=n1,n2-1
           a=y(i+1)
           b=y(i)
           h=x(i+1)-x(i)
@@ -1245,7 +1592,7 @@ CONTAINS
 
     ELSE IF(iorder==2) THEN
 
-       DO i=1,n-2
+       DO i=n1,n2-2
 
           x1=x(i)
           x2=x(i+1)
@@ -1255,7 +1602,7 @@ CONTAINS
           y2=y(i+1)
           y3=y(i+2)
 
-          CALL fit_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
+          CALL fix_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
 
           q1=a*(x1**3.)/3.+b*(x1**2.)/2.+c*x1
           q2=a*(x2**3.)/3.+b*(x2**2.)/2.+c*x2
@@ -1277,7 +1624,7 @@ CONTAINS
 
     ELSE IF(iorder==3) THEN
 
-       DO i=1,n-1
+       DO i=n1,n2-1
 
           !First choose the integers used for defining cubics for each section
           !First and last are different because the section does not lie in the *middle* of a cubic
@@ -1315,7 +1662,7 @@ CONTAINS
           y3=y(i3)
           y4=y(i4)
 
-          CALL fit_cubic(a,b,c,d,x1,y1,x2,y2,x3,y3,x4,y4)
+          CALL fix_cubic(a,b,c,d,x1,y1,x2,y2,x3,y3,x4,y4)
 
           !These are the limits of the particular section of integral
           xi=x(i)
@@ -1330,13 +1677,13 @@ CONTAINS
 
     ELSE
 
-       STOP 'INTTAB: Error, order not specified correctly'
+       STOP 'INTEGRATE_TABLE: Error, order not specified correctly'
 
     END IF
 
-    inttab=REAL(sum)
+    integrate_table=REAL(sum)
 
-  END FUNCTION inttab
+  END FUNCTION integrate_table
 
   FUNCTION sigma(r,z,cosm)
 
@@ -1345,7 +1692,6 @@ CONTAINS
     REAL :: sigma
     REAL, INTENT(IN) :: r, z
     TYPE(cosmology), INTENT(IN) :: cosm
-    REAL, PARAMETER :: acc=1e-4
     INTEGER, PARAMETER :: iorder=3
     REAL, PARAMETER :: rsplit=1e-2
 
@@ -1789,11 +2135,38 @@ CONTAINS
 
   END FUNCTION mass
 
+  FUNCTION bnu(nu)
+
+    !Halo bias as a function of nu
+    IMPLICIT NONE
+    REAL :: bnu
+    REAL, INTENT(IN) :: nu
+
+    bnu=bst(nu)
+
+  END FUNCTION bnu
+
+  FUNCTION bst(nu)
+
+    !Sheth Tormen bias
+    IMPLICIT NONE
+    REAL :: bst
+    REAL, INTENT(IN) :: nu
+
+    REAL, PARAMETER :: p=0.3
+    REAL, PARAMETER :: q=0.707
+    REAL, PARAMETER :: dc=1.686
+
+    bst=1.+(q*(nu**2)-1.+2.*p/(1.+(q*nu**2)**p))/dc
+
+  END FUNCTION bst
+
   FUNCTION gnu(nu)
 
     !Mass function
     IMPLICIT NONE
-    REAL :: gnu, nu
+    REAL :: gnu
+    REAL, INTENT(IN) :: nu
 
     gnu=gst(nu)
 
@@ -1805,16 +2178,28 @@ CONTAINS
     !Note I use nu=dc/sigma(M) and this Sheth & Tormen (1999) use nu=(dc/sigma)^2
     !This accounts for small differences in the equations
     IMPLICIT NONE
-    REAL :: nu, gst
-    REAL :: p, q
+    REAL :: gst
+    REAL, INTENT(IN) :: nu
 
-    p=0.3
-    q=0.707
+    REAL, PARAMETER :: p=0.3
+    REAL, PARAMETER :: q=0.707
+    REAL, PARAMETER :: A=0.21616
 
-    gst=0.21616*(1.+((q*nu*nu)**(-p)))*exp(-q*nu*nu/2.)
+    gst=A*(1.+((q*nu*nu)**(-p)))*exp(-q*nu*nu/2.)
 
   END FUNCTION gst
 
+  FUNCTION gnubnu(nu)
+
+    !g(nu) times b(nu)
+    IMPLICIT NONE
+    REAL :: gnubnu
+    REAL, INTENT(IN) :: nu
+
+    gnubnu=gnu(nu)*bnu(nu)
+
+  END FUNCTION gnubnu
+  
   FUNCTION omega_m(z,cosm)
 
     !This calculates Omega_m variations with z!
@@ -1863,7 +2248,6 @@ CONTAINS
     REAL*8 :: sum_n, sum_2n, sum_new, sum_old
     INTEGER, PARAMETER :: jmin=5
     INTEGER, PARAMETER :: jmax=30
-    REAL, PARAMETER :: acc=1e-4
     INTEGER, PARAMETER :: iorder=3   
 
     !Integration range for integration parameter
@@ -1981,7 +2365,6 @@ CONTAINS
     REAL*8 :: sum_n, sum_2n, sum_new, sum_old
     INTEGER, PARAMETER :: jmin=5
     INTEGER, PARAMETER :: jmax=30
-    REAL, PARAMETER :: acc=1e-4
     INTEGER, PARAMETER :: iorder=3   
 
     !Integration range for integration parameter
@@ -2692,7 +3075,6 @@ CONTAINS
     INTEGER, INTENT(IN) :: n
     REAL, INTENT(IN) :: x, xtab(n)
     REAL :: x1, x2, xn
-    REAL, PARAMETER :: acc=1e-4 !Test for linear table
 
     !Returns the integer (table position) below the value of x
     !eg. if x(3)=6. and x(4)=7. and x=6.5 this will return 6
@@ -2870,7 +3252,6 @@ CONTAINS
     REAL, ALLOCATABLE :: d_tab(:), v_tab(:), a_tab(:)
     REAL :: ainit, amax, dinit, vinit
     INTEGER, PARAMETER :: n=64 !Number of entries for growth tables
-    REAL, PARAMETER :: acc=1e-4 !Overall accuracy for the ODE solver
 
     !The calculation should start at a z when Om_m(z)=1., so that the assumption
     !of starting in the g\propto a growing mode is valid (this will not work for early DE)
@@ -2882,13 +3263,13 @@ CONTAINS
     dinit=ainit
     vinit=1.    
 
-    IF(ihm==1) WRITE(*,*) 'GROWTH: Solving growth equation'
+    IF(verbose) WRITE(*,*) 'GROWTH: Solving growth equation'
     CALL ode_growth(d_tab,v_tab,a_tab,0.,ainit,amax,dinit,vinit,acc,3,cosm)
-    IF(ihm==1) WRITE(*,*) 'GROWTH: ODE done'
+    IF(verbose) WRITE(*,*) 'GROWTH: ODE done'
 
     !Normalise so that g(z=0)=1
     norm=find(1.,a_tab,d_tab,SIZE(a_tab),3,3,2)
-    IF(ihm==1) WRITE(*,*) 'GROWTH: unnormalised g(a=1):', norm
+    IF(verbose) WRITE(*,*) 'GROWTH: unnormalised g(a=1):', norm
     d_tab=d_tab/norm
 
     !This downsamples the tables that come out of the ODE solver (which can be a bit long)
@@ -2896,7 +3277,7 @@ CONTAINS
     IF(ALLOCATED(cosm%a_grow)) DEALLOCATE(cosm%a_grow,cosm%grow)
     cosm%ng=n
 
-    IF(ihm==1) WRITE(*,*) 'GROWTH: Entries in table:', n
+    IF(verbose) WRITE(*,*) 'GROWTH: Entries in table:', n
 
     ALLOCATE(cosm%a_grow(n),cosm%grow(n))
     DO i=1,n
@@ -2905,8 +3286,8 @@ CONTAINS
        cosm%grow(i)=find(a,a_tab,d_tab,SIZE(a_tab),3,3,2)
     END DO
 
-    IF(ihm==1) WRITE(*,*) 'GROWTH: Done'
-    IF(ihm==1) WRITE(*,*)
+    IF(verbose) WRITE(*,*) 'GROWTH: Done'
+    IF(verbose) WRITE(*,*)
 
   END SUBROUTINE fill_growtab
 
