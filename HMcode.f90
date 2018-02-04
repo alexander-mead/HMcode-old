@@ -47,7 +47,7 @@ PROGRAM HMcode
   !0 - Standard halo-model calculation (Dv=200, dc=1.686) with linear two-halo term'
   !1 - Do the accurate calculation detailed in Mead et al. (2015; 1505.07833) with updates from Mead et al. (2016; 1602.02154)
   !2 - Standard halo-model calculation (Dv=200, dc=1.686) with full two-halo term'
-  INTEGER, PARAMETER :: imead=2
+  INTEGER, PARAMETER :: imead=1
   
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -96,8 +96,8 @@ PROGRAM HMcode
 
   !Set number of k points and k range (log spaced)
   nk=200
-  kmin=0.001
-  kmax=1.e4
+  kmin=1e-3
+  kmax=1e4
   CALL fill_table(log(kmin),log(kmax),k,nk)
   k=exp(k)
 
@@ -1117,7 +1117,7 @@ CONTAINS
     !Stop compile-time warnings
     crap=cosm%A
 
-    IF(imead==0 .OR. imead==2) THEN
+    IF(imead==2) THEN
 
        ALLOCATE(integrand(lut%n))
 
@@ -1152,7 +1152,7 @@ CONTAINS
 
        p_2h=plin*(sum**2)!*(rhom**2)
 
-    ELSE IF(imead==1) THEN
+    ELSE IF(imead==0 .OR. imead==1) THEN
 
        sigv=lut%sigv
        frac=fdamp(lut)
