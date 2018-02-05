@@ -43,11 +43,11 @@ PROGRAM HMcode
   !Accuracy parameter
   REAL, PARAMETER :: acc=1e-4
 
-  !imead parameter
-  !0 - Standard halo-model calculation (Dv=200, dc=1.686) with linear two-halo term'
+  !ihm parameter
   !1 - Do the accurate calculation detailed in Mead et al. (2015; 1505.07833) with updates from Mead et al. (2016; 1602.02154)
-  !2 - Standard halo-model calculation (Dv=200, dc=1.686) with full two-halo term'
-  INTEGER, PARAMETER :: imead=1
+  !2 - Standard halo-model calculation (Dv=200, dc=1.686) with linear two-halo term'
+  !3 - Standard halo-model calculation (Dv=200, dc=1.686) with full two-halo term'
+  INTEGER, PARAMETER :: ihm=1
   
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -57,7 +57,7 @@ PROGRAM HMcode
   !2017/08/?? - Increased integration routine speed
   !2017/09/27 - Added baryon models explicitly
   !2018/01/18 - Added capacity for input CAMB linear P(k)
-  !2018/02/?? - Added two-halo bias integral
+  !2018/02/04 - Added two-halo bias integral
 
   !HMcode developed by Alexander Mead
   !If you use this in your work please cite the original paper: http://arxiv.org/abs/1505.07833
@@ -83,14 +83,14 @@ PROGRAM HMcode
   WRITE(*,*) 'Welcome to HMcode'
   WRITE(*,*) '================='
   WRITE(*,*)
-  IF(imead==0) THEN
-     WRITE(*,*) 'HMcode: Doing standard calculation with linear two-halo term'
-  ELSE IF(imead==1) THEN
+  IF(ihm==1) THEN
      WRITE(*,*) 'HMcode: Doing accurate calculation'
-  ELSE IF(imead==2) THEN
+  ELSE IF(ihm==2) THEN
+     WRITE(*,*) 'HMcode: Doing standard calculation with linear two-halo term'
+  ELSE IF(ihm==3) THEN
      WRITE(*,*) 'HMcode: Doing standard calculation with full two-halo term'
   ELSE
-     STOP 'HMcode: Error, imead specified incorrectly'
+     STOP 'HMcode: Error, ihm specified incorrectly'
   END IF
   WRITE(*,*)
 
@@ -232,12 +232,12 @@ CONTAINS
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    IF(imead==0 .OR. imead==2) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        Delta_v=200.
-    ELSE IF(imead==1) THEN
+    ELSE IF(ihm==1) THEN
        Delta_v=418.*(omega_m(z,cosm)**(-0.352))
     ELSE
-       STOP 'Error, imead defined incorrectly'
+       STOP 'Error, ihm defined incorrectly'
     END IF
 
   END FUNCTION Delta_v
@@ -250,12 +250,12 @@ CONTAINS
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    IF(imead==0 .OR. imead==2) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        delta_c=1.686
-    ELSE IF(imead==1) THEN
+    ELSE IF(ihm==1) THEN
        delta_c=1.59+0.0314*log(sigma_cb(8.,z,cosm))
     ELSE
-       STOP 'Error, imead defined incorrectly'
+       STOP 'Error, ihm defined incorrectly'
     END IF
 
     !Nakamura & Suto (1997) fitting formula for LCDM
@@ -270,14 +270,14 @@ CONTAINS
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    IF(imead==0 .OR. imead==2) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        eta=0.
-    ELSE IF(imead==1) THEN
+    ELSE IF(ihm==1) THEN
        !The first parameter here is 'eta_0' in Mead et al. (2015; arXiv 1505.07833)
        !eta=0.603-0.3*(sigma_cb(8.,z,cosm))
        eta=cosm%eta0-0.3*(sigma_cb(8.,z,cosm))
     ELSE
-       STOP 'Error, imead defined incorrectly'
+       STOP 'Error, ihm defined incorrectly'
     END IF
 
   END FUNCTION eta
@@ -289,14 +289,14 @@ CONTAINS
     !TYPE(cosmology), INTENT(IN) :: cosm
     TYPE(tables), INTENT(IN) :: lut
 
-    IF(imead==0 .OR. imead==2) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        !Set to zero for the standard Poisson one-halo term
        kstar=0.
-    ELSE IF(imead==1) THEN
+    ELSE IF(ihm==1) THEN
        !One-halo cut-off wavenumber
        kstar=0.584*(lut%sigv)**(-1.)
     ELSE
-       STOP 'Error, imead defined incorrectly'
+       STOP 'Error, ihm defined incorrectly'
     END IF
 
   END FUNCTION kstar
@@ -308,14 +308,14 @@ CONTAINS
     TYPE(cosmology), INTENT(IN) :: cosm
 
     !Halo concentration pre-factor
-    IF(imead==0 .OR. imead==2) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        !Set to 4 for the standard Bullock value
        As=4.
-    ELSE IF(imead==1) THEN
+    ELSE IF(ihm==1) THEN
        !This is the 'A' halo-concentration parameter in Mead et al. (2015; arXiv 1505.07833)
        As=cosm%Abary
     ELSE
-       STOP 'Error, imead defined incorrectly'
+       STOP 'Error, ihm defined incorrectly'
     END IF
 
   END FUNCTION As
@@ -329,17 +329,17 @@ CONTAINS
     TYPE(tables), INTENT(IN) :: lut
 
     !Linear theory damping factor
-    IF(imead==0 .OR. imead==2) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        !Set to 0 for the standard linear theory two halo term
        fdamp=0.
-    ELSE IF(imead==1) THEN
+    ELSE IF(ihm==1) THEN
        !fdamp=0.188*sigma_cb(8.,z,cosm)**4.29
        fdamp=0.0095*lut%sigv100**1.37
        !Catches extreme values of fdamp that occur for ridiculous cosmologies
        IF(fdamp<1.e-3) fdamp=0.
        IF(fdamp>0.99)  fdamp=0.99
     ELSE
-       STOP 'Error, imead defined incorrectly'
+       STOP 'Error, ihm defined incorrectly'
     END IF
 
   END FUNCTION fdamp
@@ -350,14 +350,14 @@ CONTAINS
     REAL :: alpha
     TYPE(tables), INTENT(IN) :: lut
 
-    IF(imead==0 .OR. imead==2) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        !Set to 1 for the standard halo model addition of one- and two-halo terms
        alpha=1.
-    ELSE IF(imead==1) THEN
+    ELSE IF(ihm==1) THEN
        !This uses the top-hat defined neff
        alpha=3.24*1.85**lut%neff
     ELSE
-       STOP 'Error, imead defined incorrectly'
+       STOP 'Error, ihm defined incorrectly'
     END IF
 
     !Catches values of alpha that are crazy
@@ -1110,14 +1110,14 @@ CONTAINS
     REAL :: sum, crap
     INTEGER :: i
 
-    INTEGER, PARAMETER :: ip2h=1
+    INTEGER, PARAMETER :: ip2h=2
 
     !rhom=comoving_matter_density(cosm)
 
     !Stop compile-time warnings
     crap=cosm%A
 
-    IF(imead==2) THEN
+    IF(ihm==3) THEN
 
        ALLOCATE(integrand(lut%n))
 
@@ -1128,7 +1128,7 @@ CONTAINS
           w=wk(i)
 
           !Linear bias term
-          integrand(i)=gnu(nu)*bnu(nu)*w!/m
+          integrand(i)=gnu(nu)*bnu(nu)*w
 
        END DO
 
@@ -1139,8 +1139,7 @@ CONTAINS
           !Do nothing in this case
        ELSE IF(ip2h==1) THEN
           !Add on the value of integral b(nu)*g(nu) assuming w=1
-          sum=sum+lut%gbmin!*halo_fraction(ih(1),m,cosm)!/rhom
-          !sum12=sum12+lut%gbmin*halo_fraction(ih(2),m,cosm)!/rhom
+          sum=sum+lut%gbmin
        ELSE IF(ip2h==2) THEN
           !Put the missing part of the integrand as a delta function at nu1
           m0=lut%m(1)
@@ -1150,9 +1149,9 @@ CONTAINS
           STOP 'P_2h: Error, ip2h not specified correctly'
        END IF
 
-       p_2h=plin*(sum**2)!*(rhom**2)
+       p_2h=plin*sum**2
 
-    ELSE IF(imead==0 .OR. imead==1) THEN
+    ELSE IF(ihm==1 .OR. ihm==2) THEN
 
        sigv=lut%sigv
        frac=fdamp(lut)
@@ -1168,7 +1167,7 @@ CONTAINS
 
     ELSE
 
-       STOP 'P_2h: Error, imead specified incorrectly'
+       STOP 'P_2h: Error, ihm specified incorrectly'
 
     END IF
 
@@ -1340,127 +1339,6 @@ CONTAINS
 
   END FUNCTION wk_tophat
 
-!!$  FUNCTION inttab(x,y,n,iorder)
-!!$
-!!$    !Integrates tables y(x)dx
-!!$    IMPLICIT NONE
-!!$    REAL :: inttab
-!!$    INTEGER, INTENT(IN) :: n
-!!$    REAL, INTENT(IN) :: x(n), y(n)
-!!$    REAL :: a, b, c, d, h
-!!$    REAL :: q1, q2, q3, qi, qf
-!!$    REAL :: x1, x2, x3, x4, y1, y2, y3, y4, xi, xf
-!!$    REAL*8 :: sum
-!!$    INTEGER :: i, i1, i2, i3, i4
-!!$    INTEGER, INTENT(IN) :: iorder
-!!$
-!!$    sum=0.d0
-!!$
-!!$    IF(iorder==1) THEN
-!!$
-!!$       !Sums over all Trapezia (a+b)*h/2
-!!$       DO i=1,n-1
-!!$          a=y(i+1)
-!!$          b=y(i)
-!!$          h=x(i+1)-x(i)
-!!$          sum=sum+(a+b)*h/2.d0
-!!$       END DO
-!!$
-!!$    ELSE IF(iorder==2) THEN
-!!$
-!!$       DO i=1,n-2
-!!$
-!!$          x1=x(i)
-!!$          x2=x(i+1)
-!!$          x3=x(i+2)
-!!$
-!!$          y1=y(i)
-!!$          y2=y(i+1)
-!!$          y3=y(i+2)
-!!$
-!!$          CALL fit_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
-!!$
-!!$          q1=a*(x1**3.)/3.+b*(x1**2.)/2.+c*x1
-!!$          q2=a*(x2**3.)/3.+b*(x2**2.)/2.+c*x2
-!!$          q3=a*(x3**3.)/3.+b*(x3**2.)/2.+c*x3
-!!$
-!!$          !Takes value for first and last sections but averages over sections where you
-!!$          !have two independent estimates of the area
-!!$          IF(n==3) THEN
-!!$             sum=sum+q3-q1
-!!$          ELSE IF(i==1) THEN
-!!$             sum=sum+(q2-q1)+(q3-q2)/2.d0
-!!$          ELSE IF(i==n-2) THEN
-!!$             sum=sum+(q2-q1)/2.d0+(q3-q2)
-!!$          ELSE
-!!$             sum=sum+(q3-q1)/2.
-!!$          END IF
-!!$
-!!$       END DO
-!!$
-!!$    ELSE IF(iorder==3) THEN
-!!$
-!!$       DO i=1,n-1
-!!$
-!!$          !First choose the integers used for defining cubics for each section
-!!$          !First and last are different because the section does not lie in the *middle* of a cubic
-!!$
-!!$          IF(i==1) THEN
-!!$
-!!$             i1=1
-!!$             i2=2
-!!$             i3=3
-!!$             i4=4
-!!$
-!!$          ELSE IF(i==n-1) THEN
-!!$
-!!$             i1=n-3
-!!$             i2=n-2
-!!$             i3=n-1
-!!$             i4=n
-!!$
-!!$          ELSE
-!!$
-!!$             i1=i-1
-!!$             i2=i
-!!$             i3=i+1
-!!$             i4=i+2
-!!$
-!!$          END IF
-!!$
-!!$          x1=x(i1)
-!!$          x2=x(i2)
-!!$          x3=x(i3)
-!!$          x4=x(i4)
-!!$
-!!$          y1=y(i1)
-!!$          y2=y(i2)
-!!$          y3=y(i3)
-!!$          y4=y(i4)
-!!$
-!!$          CALL fit_cubic(a,b,c,d,x1,y1,x2,y2,x3,y3,x4,y4)
-!!$
-!!$          !These are the limits of the particular section of integral
-!!$          xi=x(i)
-!!$          xf=x(i+1)
-!!$
-!!$          qi=a*(xi**4.)/4.+b*(xi**3.)/3.+c*(xi**2.)/2.+d*xi
-!!$          qf=a*(xf**4.)/4.+b*(xf**3.)/3.+c*(xf**2.)/2.+d*xf
-!!$
-!!$          sum=sum+qf-qi
-!!$
-!!$       END DO
-!!$
-!!$    ELSE
-!!$
-!!$       STOP 'INTTAB: Error, order not specified correctly'
-!!$
-!!$    END IF
-!!$
-!!$    inttab=REAL(sum)
-!!$
-!!$  END FUNCTION inttab
-
   FUNCTION integrate(a,b,f,acc,iorder)
 
     !Integrates between a and b until desired accuracy is reached
@@ -1561,8 +1439,6 @@ CONTAINS
 
   FUNCTION integrate_table(x,y,n,n1,n2,iorder)
 
-    USE fix_polynomial
-
     !Integrates tables y(x)dx
     IMPLICIT NONE
     REAL :: integrate_table
@@ -1602,7 +1478,7 @@ CONTAINS
           y2=y(i+1)
           y3=y(i+2)
 
-          CALL fix_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
+          CALL fit_quadratic(a,b,c,x1,y1,x2,y2,x3,y3)
 
           q1=a*(x1**3.)/3.+b*(x1**2.)/2.+c*x1
           q2=a*(x2**3.)/3.+b*(x2**2.)/2.+c*x2
@@ -1662,7 +1538,7 @@ CONTAINS
           y3=y(i3)
           y4=y(i4)
 
-          CALL fix_cubic(a,b,c,d,x1,y1,x2,y2,x3,y3,x4,y4)
+          CALL fit_cubic(a,b,c,d,x1,y1,x2,y2,x3,y3,x4,y4)
 
           !These are the limits of the particular section of integral
           xi=x(i)
@@ -1715,7 +1591,6 @@ CONTAINS
     REAL :: y, w_hat
 
     IF(k==0.) THEN
-       !k=0.
        sigma_integrand=0.
     ELSE
        y=k*R
