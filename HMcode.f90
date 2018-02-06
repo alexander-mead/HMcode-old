@@ -3099,14 +3099,13 @@ CONTAINS
     !Finds the length of a file
     IMPLICIT NONE
     CHARACTER(len=64) :: file_name
-    INTEGER ::n, file_length
-    REAL :: data   
+    INTEGER ::n, file_length  
 
     OPEN(7,file=file_name)
     n=0
     DO
        n=n+1
-       READ(7,*, end=301) data
+       READ(7,*, end=301)
     END DO
 
     !301 is just the label to jump to when the end of the file is reached
