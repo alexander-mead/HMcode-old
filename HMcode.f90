@@ -537,11 +537,11 @@ CONTAINS
     cosm%wa=0.
 
     !Baryon feedback parameters
-    !cosm%Abary=3.13 !DMONLY
+    cosm%Abary=3.13 !DMONLY
     !cosm%Abary=3.12 !REF
     !cosm%Abary=2.41 !DBLIM
     !cosm%Abary=2.11 !AGN
-    cosm%Abary=2.75
+    !cosm%Abary=2.75
 
     !Enfore one-parameter baryon model (see Mead et al. 2015)
     cosm%eta0=0.98-0.12*cosm%Abary
