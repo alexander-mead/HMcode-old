@@ -24,7 +24,7 @@ Once these look-up tables have been filled the halomodel integral can then be ca
 
 In testing I was able to get 16 redshifts, with 200 *k*-points, in 0.3 seconds (using gfortran on a 2015 Macbook with -O3 optimisation). 
 
-The gnuplot script ```plot.p``` that can be used to plot the output. It can be run using ```gnuplot> load 'plot.p```.
+The gnuplot script ```power.p``` that can be used to plot the output. It can be run using ```gnuplot > load 'power.p```.
 
 Please let me know if you need any help running the code. Or if you have any questions whatsoever.
 
