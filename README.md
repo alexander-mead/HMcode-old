@@ -12,11 +12,11 @@ When it starts, the code fills up some arrays for the wavenumber *k* and redshif
 
 The option ```ihm``` can be changed in the code:
 
-1 - (Default) performs the accurate calculation from Mead et al., detailed in Appendix B of http://arxiv.org/abs/1505.07833 
+```ihm=1``` - (Default) performs the accurate calculation from Mead et al., detailed in Appendix B of http://arxiv.org/abs/1505.07833 
 
-2 - the code performs the standard halo model calculation (*Dv=200*, *dc=1.686*, Sheth & Tormen (1999) mass function, Bullock (2001) concentration-mass relation; although it neglects the standard bias factors in the two-halo term, because this is not important for the matter spectrum)
+```ihm=2``` - the code performs the standard halo model calculation (*Dv=200*, *dc=1.686*, Sheth & Tormen (1999) mass function, Bullock (2001) concentration-mass relation; although it neglects the standard bias factors in the two-halo term, because this is not important for the matter spectrum)
 
-3 - Same as option 2 but including the two-halo term with the bias terms
+```ihm=2``` - Similar to ```ihm=2``` but including a two-halo term with the linear halo bias terms
 
 The code then loops through redshift *z* (outer loop) and wavenumber *k* (inner loop) producing power at each redshift and wave number. The ordering of loops (*z* then *k*) is important because for each new redshift the code needs to call ```halomod_init``` to fill up redshift-dependent look-up tables for the halomodel calculation. These look-up tables contain various redshift-dependent halo properties, such as mass, virial radius, concentration etc. which are then used in the one-halo integral.
 
