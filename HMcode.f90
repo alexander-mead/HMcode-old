@@ -44,6 +44,7 @@ PROGRAM HMcode
   REAL, PARAMETER :: acc=1e-4
 
   !ihm parameter
+  !0 - Linear theory only (good for testing and comparisons)
   !1 - Do the accurate calculation detailed in Mead et al. (2015; 1505.07833) with updates from Mead et al. (2016; 1602.02154)
   !2 - Standard halo-model calculation (Dv=200, dc=1.686) with linear two-halo term'
   !3 - Standard halo-model calculation (Dv=200, dc=1.686) with full two-halo term'
@@ -58,6 +59,7 @@ PROGRAM HMcode
   !2017/09/27 - Added baryon models explicitly
   !2018/01/18 - Added capacity for input CAMB linear P(k)
   !2018/02/04 - Added two-halo bias integral
+  !2018/02/14 - Added ability to do linear theory
 
   !HMcode developed by Alexander Mead
   !If you use this in your work please cite the original paper: http://arxiv.org/abs/1505.07833
@@ -83,7 +85,9 @@ PROGRAM HMcode
   WRITE(*,*) 'Welcome to HMcode'
   WRITE(*,*) '================='
   WRITE(*,*)
-  IF(ihm==1) THEN
+  IF(ihm==0) THEN
+     WRITE(*,*) 'HMcode: Doing linear theory only'
+  ELSE IF(ihm==1) THEN
      WRITE(*,*) 'HMcode: Doing accurate calculation'
   ELSE IF(ihm==2) THEN
      WRITE(*,*) 'HMcode: Doing standard calculation with linear two-halo term'
@@ -232,12 +236,12 @@ CONTAINS
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    IF(ihm==2 .OR. ihm==3) THEN
+    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
        Delta_v=200.
     ELSE IF(ihm==1) THEN
        Delta_v=418.*(omega_m(z,cosm)**(-0.352))
     ELSE
-       STOP 'Error, ihm defined incorrectly'
+       STOP 'DELTA_V: Error, ihm defined incorrectly'
     END IF
 
   END FUNCTION Delta_v
@@ -250,12 +254,12 @@ CONTAINS
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    IF(ihm==2 .OR. ihm==3) THEN
+    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
        delta_c=1.686
     ELSE IF(ihm==1) THEN
        delta_c=1.59+0.0314*log(sigma_cb(8.,z,cosm))
     ELSE
-       STOP 'Error, ihm defined incorrectly'
+       STOP 'DELTA_C: Error, ihm defined incorrectly'
     END IF
 
     !Nakamura & Suto (1997) fitting formula for LCDM
@@ -270,14 +274,14 @@ CONTAINS
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    IF(ihm==2 .OR. ihm==3) THEN
+    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
        eta=0.
     ELSE IF(ihm==1) THEN
        !The first parameter here is 'eta_0' in Mead et al. (2015; arXiv 1505.07833)
        !eta=0.603-0.3*(sigma_cb(8.,z,cosm))
        eta=cosm%eta0-0.3*(sigma_cb(8.,z,cosm))
     ELSE
-       STOP 'Error, ihm defined incorrectly'
+       STOP 'ETA: Error, ihm defined incorrectly'
     END IF
 
   END FUNCTION eta
@@ -289,14 +293,14 @@ CONTAINS
     !TYPE(cosmology), INTENT(IN) :: cosm
     TYPE(tables), INTENT(IN) :: lut
 
-    IF(ihm==2 .OR. ihm==3) THEN
+    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
        !Set to zero for the standard Poisson one-halo term
        kstar=0.
     ELSE IF(ihm==1) THEN
        !One-halo cut-off wavenumber
        kstar=0.584*(lut%sigv)**(-1.)
     ELSE
-       STOP 'Error, ihm defined incorrectly'
+       STOP 'KSTAR: Error, ihm defined incorrectly'
     END IF
 
   END FUNCTION kstar
@@ -308,14 +312,14 @@ CONTAINS
     TYPE(cosmology), INTENT(IN) :: cosm
 
     !Halo concentration pre-factor
-    IF(ihm==2 .OR. ihm==3) THEN
+    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
        !Set to 4 for the standard Bullock value
        As=4.
     ELSE IF(ihm==1) THEN
        !This is the 'A' halo-concentration parameter in Mead et al. (2015; arXiv 1505.07833)
        As=cosm%Abary
     ELSE
-       STOP 'Error, ihm defined incorrectly'
+       STOP 'AS: Error, ihm defined incorrectly'
     END IF
 
   END FUNCTION As
@@ -329,7 +333,7 @@ CONTAINS
     TYPE(tables), INTENT(IN) :: lut
 
     !Linear theory damping factor
-    IF(ihm==2 .OR. ihm==3) THEN
+    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
        !Set to 0 for the standard linear theory two halo term
        fdamp=0.
     ELSE IF(ihm==1) THEN
@@ -339,7 +343,7 @@ CONTAINS
        IF(fdamp<1.e-3) fdamp=0.
        IF(fdamp>0.99)  fdamp=0.99
     ELSE
-       STOP 'Error, ihm defined incorrectly'
+       STOP 'FDAMP: Error, ihm defined incorrectly'
     END IF
 
   END FUNCTION fdamp
@@ -350,14 +354,14 @@ CONTAINS
     REAL :: alpha
     TYPE(tables), INTENT(IN) :: lut
 
-    IF(ihm==2 .OR. ihm==3) THEN
+    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
        !Set to 1 for the standard halo model addition of one- and two-halo terms
        alpha=1.
     ELSE IF(ihm==1) THEN
        !This uses the top-hat defined neff
        alpha=3.24*1.85**lut%neff
     ELSE
-       STOP 'Error, ihm defined incorrectly'
+       STOP 'ALPHA: Error, ihm defined incorrectly'
     END IF
 
     !Catches values of alpha that are crazy
@@ -419,28 +423,38 @@ CONTAINS
     REAL :: wk(lut%n)
     INTEGER :: i
 
-    IF(k==0.) THEN
+    IF(ihm==0) THEN
+
+       p2h=plin
        p1h=0.
-       p2h=0.
+       pfull=plin
+
     ELSE
 
-       !Only call eta once
-       et=eta(z,cosm)
+       IF(k==0.) THEN
+          p1h=0.
+          p2h=0.
+       ELSE
 
-       DO i=1,lut%n
-          nu=lut%nu(i)
-          rv=lut%rv(i)
-          c=lut%c(i)
-          wk(i)=win(k*nu**et,rv,c)
-       END DO
-       
-       p1h=p_1h(wk,k,lut,cosm)
-       p2h=p_2h(wk,k,plin,lut,cosm)
-       
+          !Only call eta once
+          et=eta(z,cosm)
+
+          DO i=1,lut%n
+             nu=lut%nu(i)
+             rv=lut%rv(i)
+             c=lut%c(i)
+             wk(i)=win(k*nu**et,rv,c)
+          END DO
+
+          p1h=p_1h(wk,k,lut,cosm)
+          p2h=p_2h(wk,k,plin,lut,cosm)
+
+       END IF
+
+       alp=alpha(lut)
+       pfull=(p2h**alp+p1h**alp)**(1./alp)
+
     END IF
-
-    alp=alpha(lut)
-    pfull=(p2h**alp+p1h**alp)**(1./alp)
 
   END SUBROUTINE halomod
 
