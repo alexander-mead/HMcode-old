@@ -48,7 +48,7 @@ PROGRAM HMcode
   !1 - Do the accurate calculation detailed in Mead et al. (2015; 1505.07833) with updates from Mead et al. (2016; 1602.02154)
   !2 - Standard halo-model calculation (Dv=200, dc=1.686) with linear two-halo term'
   !3 - Standard halo-model calculation (Dv=200, dc=1.686) with full two-halo term'
-  INTEGER, PARAMETER :: ihm=1
+  INTEGER, PARAMETER :: ihm=0
   
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -88,7 +88,7 @@ PROGRAM HMcode
   IF(ihm==0) THEN
      WRITE(*,*) 'HMcode: Doing linear theory only'
   ELSE IF(ihm==1) THEN
-     WRITE(*,*) 'HMcode: Doing accurate calculation'
+     WRITE(*,*) 'HMcode: Doing accurate calculation (Mead et al. 2015 and 2016)'
   ELSE IF(ihm==2) THEN
      WRITE(*,*) 'HMcode: Doing standard calculation with linear two-halo term'
   ELSE IF(ihm==3) THEN
@@ -151,7 +151,7 @@ PROGRAM HMcode
      z=ztab(j)
 
      !Initiliasation for the halomodel calcualtion
-     CALL halomod_init(z,lut,cosm)
+     IF(ihm .NE. 0) CALL halomod_init(z,lut,cosm)
 
      !Loop over k values
      DO i=1,nk
@@ -831,9 +831,9 @@ CONTAINS
     CALL conc_bull(z,cosm,lut)
 
     IF(verbose) THEN
-       WRITE(*,*) 'HALOMOD: c tables filled'
-       WRITE(*,*) 'HALOMOD: c min:', lut%c(lut%n)
-       WRITE(*,*) 'HALOMOD: c max:', lut%c(1)
+       WRITE(*,*) 'HALOMOD: concentration tables filled'
+       WRITE(*,*) 'HALOMOD: minimum concentration:', lut%c(lut%n)
+       WRITE(*,*) 'HALOMOD: maximum concentration:', lut%c(1)
        WRITE(*,*) 'HALOMOD: Done'
        WRITE(*,*)
        CALL write_parameters(z,lut,cosm)
@@ -991,7 +991,7 @@ CONTAINS
     REAL :: cosmic_density
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    !In Msun per Mpc^3 with h factors included. The constant does this.
+    !Units are Msun/h per (Mpc/h)^3
     cosmic_density=(2.775e11)*cosm%om_m
 
   END FUNCTION cosmic_density
