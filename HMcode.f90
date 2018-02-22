@@ -40,7 +40,7 @@ PROGRAM HMcode
   !Constants
   REAL, PARAMETER :: pi=3.141592654
 
-  !Accuracy parameter
+  !Accuracy parameter for integrations
   REAL, PARAMETER :: acc=1e-4
 
   !ihm parameter
