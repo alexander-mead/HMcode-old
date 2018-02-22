@@ -5,8 +5,8 @@ MODULE cosdef
      REAL :: om_m, om_b, om_v, om_c, h, n, sig8, w, wa
      REAL :: A, pkz
      REAL :: eta0, Abary
-     REAL, ALLOCATABLE :: k_plin(:), plin(:)
-     REAL, ALLOCATABLE :: r_sigma(:), sigma(:)
+     REAL, ALLOCATABLE :: k_plin(:), plin(:) !Note that these will be stored as log
+     REAL, ALLOCATABLE :: r_sigma(:), sigma(:) !Note that these will be stored as log
      REAL, ALLOCATABLE :: a_grow(:), grow(:)
      INTEGER :: nsig, ng, nk
      LOGICAL :: itab
@@ -48,7 +48,7 @@ PROGRAM HMcode
   !1 - Do the accurate calculation detailed in Mead et al. (2015; 1505.07833) with updates from Mead et al. (2016; 1602.02154)
   !2 - Standard halo-model calculation (Dv=200, dc=1.686) with linear two-halo term'
   !3 - Standard halo-model calculation (Dv=200, dc=1.686) with full two-halo term'
-  INTEGER, PARAMETER :: ihm=0
+  INTEGER, PARAMETER :: ihm=1
   
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -578,8 +578,12 @@ CONTAINS
        !'Grow' the input power to z=0
        IF(verbose) WRITE(*,*) 'INITIALISE: Growing input P(k) to z=0'
        cosm%plin=cosm%plin*(grow(0.,cosm)/grow(cosm%pkz,cosm))**2
+
+       !Make look up tables logarithmic
        cosm%plin=log(cosm%plin)
        cosm%k_plin=log(cosm%k_plin)
+
+       !Calculate sigma_8
        sigi=sigma(8.,0.,cosm)
        cosm%sig8=sigi
        IF(verbose) WRITE(*,*) 'INITIALISE: sigma_8:', sigi
@@ -1313,6 +1317,7 @@ CONTAINS
     !Must be allocated after the sigtab calulation above
     ALLOCATE(cosm%r_sigma(nsig),cosm%sigma(nsig))
 
+    !Make look up tables logarithmic
     cosm%r_sigma=log(rtab)
     cosm%sigma=log(sigtab)
 
