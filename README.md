@@ -12,6 +12,8 @@ When it starts, the code fills up some arrays for the wavenumber *k* and redshif
 
 The option ```ihm``` can be changed in the code:
 
+```ihm=0``` - Linear theory only. Useful for testing and comparisons.
+
 ```ihm=1``` - (Default) performs the accurate calculation from Mead et al., detailed in Appendix B of http://arxiv.org/abs/1505.07833 
 
 ```ihm=2``` - the code performs the standard halo model calculation (*Dv=200*, *dc=1.686*, Sheth & Tormen (1999) mass function, Bullock (2001) concentration-mass relation; although it neglects the standard bias factors in the two-halo term, because this is not important for the matter spectrum)
@@ -49,4 +51,4 @@ UPDATE: 2018/01/18
 Added support for an input linear spectrum from ```CAMB```. This can be input via the command line as described above.
 
 UPDATE: 2018/02/14
-Added support for a standard two-halo term. This can be activated by setting ```ihm=3``` in the code. Now ```ihm=1``` is the accurate calculation whereas ```ihm=2``` is the standard calculation but with a linear theory two-halo term. The variable ```imead``` has been removed. There is a new logical ```verbose```.
+Added support for a standard two-halo term. This can be activated by setting ```ihm=3``` in the code. Now ```ihm=1``` is the accurate calculation whereas ```ihm=2``` is the standard calculation but with a linear theory two-halo term. The variable ```imead``` has been removed. There is a new logical ```verbose```. Also added option ```ihm=0``` to do linear theory only.
