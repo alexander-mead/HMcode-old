@@ -26,15 +26,17 @@ PROGRAM HMcode
 
   USE cosdef
   IMPLICIT NONE
-  REAL :: z
+  REAL :: k, z
   REAL :: p1h, p2h, pfull, plin
-  REAL, ALLOCATABLE :: k(:), ztab(:), ptab(:,:)
+  REAL, ALLOCATABLE :: k_tab(:), z_tab(:), pfull_tab(:,:)
+  REAL, ALLOCATABLE :: plin_tab(:,:), p1h_tab(:,:), p2h_tab(:,:)
   INTEGER :: i, j, nk, nz
   LOGICAL :: verbose
   REAL :: kmin, kmax, zmin, zmax, zin
   TYPE(cosmology) :: cosm
   TYPE(tables) :: lut
   CHARACTER(len=256) :: infile, outfile, redshift
+  CHARACTER(len=256) :: outfile_linear, outfile_2halo, outfile_1halo
   LOGICAL :: lexist, itab
 
   !Constants
@@ -43,15 +45,19 @@ PROGRAM HMcode
   !Accuracy parameter for integrations
   REAL, PARAMETER :: acc=1e-4
 
-  !ihm parameter
-  !0 - Linear theory only (good for testing and comparisons)
+  !ihm parameter decides what to plot
   !1 - Do the accurate calculation detailed in Mead et al. (2015; 1505.07833) with updates from Mead et al. (2016; 1602.02154)
   !2 - Standard halo-model calculation (Dv=200, dc=1.686) with linear two-halo term'
   !3 - Standard halo-model calculation (Dv=200, dc=1.686) with full two-halo term'
   INTEGER, PARAMETER :: ihm=1
   
+  !Write all power types (linear, 2halo, 1halo, full) or only full
+  LOGICAL, PARAMETER :: write_all=.FALSE.
+  
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+  !History of substantial modifications
+  !====================================
   !2016/09/19 - Changed subroutines so that none assume an array size
   !2017/06/01 - Added comments, made recompatible with ifort (thanks Dipak Munshi)
   !2017/06/15 - Removed bug in E&H (1997) fitting function that created small spikes in linear P(k) (thanks David Copeland)
@@ -59,9 +65,10 @@ PROGRAM HMcode
   !2017/09/27 - Added baryon models explicitly
   !2018/01/18 - Added capacity for input CAMB linear P(k)
   !2018/02/04 - Added two-halo bias integral
-  !2018/02/14 - Added ability to do linear theory
+  !2018/03/14 - Added ability to write out linear theory and one- and two-halo terms
 
   !HMcode developed by Alexander Mead
+  !==================================
   !If you use this in your work please cite the original paper: http://arxiv.org/abs/1505.07833
   !Also maybe cite the update: http://arxiv.org/abs/1602.02154
   !Also consider citing the source code at ASCL: http://ascl.net/1508.001
@@ -85,9 +92,7 @@ PROGRAM HMcode
   WRITE(*,*) 'Welcome to HMcode'
   WRITE(*,*) '================='
   WRITE(*,*)
-  IF(ihm==0) THEN
-     WRITE(*,*) 'HMcode: Doing linear theory only'
-  ELSE IF(ihm==1) THEN
+  IF(ihm==1) THEN
      WRITE(*,*) 'HMcode: Doing accurate calculation (Mead et al. 2015 and 2016)'
   ELSE IF(ihm==2) THEN
      WRITE(*,*) 'HMcode: Doing standard calculation with linear two-halo term'
@@ -102,8 +107,8 @@ PROGRAM HMcode
   nk=200
   kmin=1e-3
   kmax=1e4
-  CALL fill_table(log(kmin),log(kmax),k,nk)
-  k=exp(k)
+  CALL fill_table(log(kmin),log(kmax),k_tab,nk)
+  k_tab=exp(k_tab)
 
   WRITE(*,*) 'HMcode: k min:', kmin
   WRITE(*,*) 'HMcode: k max:', kmax
@@ -114,7 +119,7 @@ PROGRAM HMcode
   nz=16
   zmin=0.
   zmax=4.
-  CALL fill_table(zmin,zmax,ztab,nz)
+  CALL fill_table(zmin,zmax,z_tab,nz)
 
   WRITE(*,*) 'HMcode: z min:', zmin
   WRITE(*,*) 'HMcode: z max:', zmax
@@ -122,7 +127,8 @@ PROGRAM HMcode
   WRITE(*,*)
 
   !Fill table for output power
-  ALLOCATE(ptab(nz,nk))
+  ALLOCATE(pfull_tab(nz,nk))
+  IF(write_all) ALLOCATE(plin_tab(nz,nk),p2h_tab(nz,nk),p1h_tab(nz,nk))
 
   !Assigns the cosmological model
   CALL assign_cosmology(cosm)
@@ -148,19 +154,30 @@ PROGRAM HMcode
   DO j=1,nz
 
      !Sets the current redshift from the table
-     z=ztab(j)
+     z=z_tab(j)
 
      !Initiliasation for the halomodel calcualtion
-     IF(ihm .NE. 0) CALL halomod_init(z,lut,cosm)
+     CALL halomod_init(z,lut,cosm)
 
      !Loop over k values
      DO i=1,nk
 
-        plin=p_lin(k(i),z,cosm)
+        !Sets the current k from the table
+        k=k_tab(i)
 
-        CALL halomod(k(i),z,p1h,p2h,pfull,plin,lut,cosm)
+        !Get the linear power spectrum at this k and z
+        plin=p_lin(k,z,cosm)
 
-        ptab(j,i)=pfull
+        !Call the halo-model calculation
+        CALL halomod(k,z,p1h,p2h,pfull,plin,lut,cosm)
+
+        !Copy the results into arrays
+        pfull_tab(j,i)=pfull
+        IF(write_all) THEN
+           plin_tab(j,i)=plin
+           p2h_tab(j,i)=p2h
+           p1h_tab(j,i)=p1h
+        END IF
 
      END DO
 
@@ -168,7 +185,7 @@ PROGRAM HMcode
         WRITE(*,fmt='(A5,A7)') 'i', 'z'
         WRITE(*,fmt='(A13)') '   ============'
      END IF
-     WRITE(*,fmt='(I5,F8.3)') j, ztab(j)
+     WRITE(*,fmt='(I5,F8.3)') j, z_tab(j)
 
   END DO
   WRITE(*,fmt='(A13)') '   ============'
@@ -181,14 +198,37 @@ PROGRAM HMcode
   WRITE(*,*) 'HMcode: The first column containts ''k'' after the hashes'
   WRITE(*,*) 'HMcode: The rows then contain the power at that ''k'' for each redshift'
   OPEN(7,file=outfile)
+  IF(write_all) THEN
+     outfile_linear='power_linear.dat'
+     outfile_2halo='power_2halo.dat'
+     outfile_1halo='power_1halo.dat'
+     OPEN(10,file=outfile_linear)
+     OPEN(11,file=outfile_2halo)
+     OPEN(12,file=outfile_1halo)
+  END IF
   DO i=0,nk
      IF(i==0) THEN
-        WRITE(7,fmt='(A20,40F20.10)') '#####', (ztab(j), j=1,nz)
+        WRITE(7,fmt='(A20,40F20.10)') '#####', (z_tab(j), j=1,nz)
+        IF(write_all) THEN
+           WRITE(10,fmt='(A20,40F20.10)') '#####', (z_tab(j), j=1,nz)
+           WRITE(11,fmt='(A20,40F20.10)') '#####', (z_tab(j), j=1,nz)
+           WRITE(12,fmt='(A20,40F20.10)') '#####', (z_tab(j), j=1,nz)
+        END IF
      ELSE
-        WRITE(7,fmt='(F20.10,40F20.10)') k(i), (ptab(j,i), j=1,nz)
+        WRITE(7,fmt='(F20.10,40F20.10)') k_tab(i), (pfull_tab(j,i), j=1,nz)
+        IF(write_all) THEN
+           WRITE(10,fmt='(F20.10,40F20.10)') k_tab(i), (plin_tab(j,i), j=1,nz)
+           WRITE(11,fmt='(F20.10,40F20.10)') k_tab(i), (p2h_tab(j,i), j=1,nz)
+           WRITE(12,fmt='(F20.10,40F20.10)') k_tab(i), (p1h_tab(j,i), j=1,nz)
+        END IF
      END IF
   END DO
   CLOSE(7)
+  IF(write_all) THEN
+     CLOSE(10)
+     CLOSE(11)
+     CLOSE(12)
+  END IF
   WRITE(*,*) 'HMcode: Done'
   WRITE(*,*)
 
@@ -236,7 +276,7 @@ CONTAINS
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        Delta_v=200.
     ELSE IF(ihm==1) THEN
        Delta_v=418.*(omega_m(z,cosm)**(-0.352))
@@ -254,16 +294,15 @@ CONTAINS
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        delta_c=1.686
     ELSE IF(ihm==1) THEN
        delta_c=1.59+0.0314*log(sigma_cb(8.,z,cosm))
+       !Nakamura & Suto (1997) fitting formula for LCDM
+       delta_c=delta_c*(1.+0.0123*log10(omega_m(z,cosm)))
     ELSE
        STOP 'DELTA_C: Error, ihm defined incorrectly'
-    END IF
-
-    !Nakamura & Suto (1997) fitting formula for LCDM
-    delta_c=delta_c*(1.+0.0123*log10(omega_m(z,cosm)))
+    END IF 
 
   END FUNCTION delta_c
 
@@ -274,7 +313,7 @@ CONTAINS
     REAL, INTENT(IN) :: z
     TYPE(cosmology), INTENT(IN) :: cosm
 
-    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        eta=0.
     ELSE IF(ihm==1) THEN
        !The first parameter here is 'eta_0' in Mead et al. (2015; arXiv 1505.07833)
@@ -293,7 +332,7 @@ CONTAINS
     !TYPE(cosmology), INTENT(IN) :: cosm
     TYPE(tables), INTENT(IN) :: lut
 
-    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        !Set to zero for the standard Poisson one-halo term
        kstar=0.
     ELSE IF(ihm==1) THEN
@@ -312,7 +351,7 @@ CONTAINS
     TYPE(cosmology), INTENT(IN) :: cosm
 
     !Halo concentration pre-factor
-    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        !Set to 4 for the standard Bullock value
        As=4.
     ELSE IF(ihm==1) THEN
@@ -333,7 +372,7 @@ CONTAINS
     TYPE(tables), INTENT(IN) :: lut
 
     !Linear theory damping factor
-    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        !Set to 0 for the standard linear theory two halo term
        fdamp=0.
     ELSE IF(ihm==1) THEN
@@ -354,7 +393,7 @@ CONTAINS
     REAL :: alpha
     TYPE(tables), INTENT(IN) :: lut
 
-    IF(ihm==0 .OR. ihm==2 .OR. ihm==3) THEN
+    IF(ihm==2 .OR. ihm==3) THEN
        !Set to 1 for the standard halo model addition of one- and two-halo terms
        alpha=1.
     ELSE IF(ihm==1) THEN
@@ -423,38 +462,31 @@ CONTAINS
     REAL :: wk(lut%n)
     INTEGER :: i
 
-    IF(ihm==0) THEN
 
-       p2h=plin
+    IF(k==0.) THEN
+       
        p1h=0.
-       pfull=plin
-
+       p2h=0.
+       
     ELSE
 
-       IF(k==0.) THEN
-          p1h=0.
-          p2h=0.
-       ELSE
+       !Only call eta once
+       et=eta(z,cosm)
 
-          !Only call eta once
-          et=eta(z,cosm)
+       DO i=1,lut%n
+          nu=lut%nu(i)
+          rv=lut%rv(i)
+          c=lut%c(i)
+          wk(i)=win(k*nu**et,rv,c)
+       END DO
 
-          DO i=1,lut%n
-             nu=lut%nu(i)
-             rv=lut%rv(i)
-             c=lut%c(i)
-             wk(i)=win(k*nu**et,rv,c)
-          END DO
-
-          p1h=p_1h(wk,k,lut,cosm)
-          p2h=p_2h(wk,k,plin,lut,cosm)
-
-       END IF
-
-       alp=alpha(lut)
-       pfull=(p2h**alp+p1h**alp)**(1./alp)
+       p1h=p_1h(wk,k,lut,cosm)
+       p2h=p_2h(wk,k,plin,lut,cosm)
 
     END IF
+
+    alp=alpha(lut)
+    pfull=(p2h**alp+p1h**alp)**(1./alp)
 
   END SUBROUTINE halomod
 
@@ -750,7 +782,7 @@ CONTAINS
     REAL, PARAMETER :: mmin=1e2 !Minimum mass for integration
     REAL, PARAMETER :: mmax=1e18 !Maximum mass for integration
     INTEGER, PARAMETER :: n=256 !Number of points for integration
-    REAL, PARAMETER :: large_nu=10. !A large value of nu(M)
+    REAL, PARAMETER :: large_nu=10. !A large value of nu
     
     !Find value of sigma_v
     lut%sigv=sqrt(dispint(0.,z,cosm)/3.)
