@@ -3411,7 +3411,7 @@ CONTAINS
     om_m=cosm%om_m
     om_v=cosm%om_v
     a=1./(1.+z)
-    H2=(om_m*(1.+z)**3.)+om_v*X_de(a,cosm)+((1.-om_m-om_v)*(1.+z)**2.)
+    H2=(om_m*(1.+z)**3)+om_v*X_de(a,cosm)+((1.-om_m-om_v)*(1.+z)**2)
 
   END FUNCTION H2
 
@@ -3426,7 +3426,7 @@ CONTAINS
 
     a=1./(1.+z)
 
-    AH=cosm%om_m*(a**(-3.))+cosm%om_v*(1.+3.*w_de(a,cosm))*X_de(a,cosm)
+    AH=cosm%om_m*((1.+z)**3)+cosm%om_v*(1.+3.*w_de(a,cosm))*X_de(a,cosm)
 
     AH=-AH/2.
 
