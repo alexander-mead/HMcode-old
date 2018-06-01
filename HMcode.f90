@@ -2,7 +2,7 @@ MODULE cosdef
 
   TYPE cosmology
      !Contains only things that do not need to be recalculated with each new z
-     REAL :: om_m, om_b, om_v, om_c, h, n, sig8, w, wa
+     REAL :: om_m, om_b, om_v, om_c, h, n, sig8, w, wa, T_cmb
      REAL :: A, pkz
      REAL :: eta0, Abary
      REAL, ALLOCATABLE :: k_plin(:), plin(:) !Note that these will be stored as log
@@ -77,6 +77,7 @@ PROGRAM HMcode
   !2018/01/18 - Added capacity for input CAMB linear P(k)
   !2018/02/04 - Added two-halo bias integral
   !2018/03/14 - Added ability to write out linear theory and one- and two-halo terms
+  !2018/06/01 - Changed default CMB temperature and lined up Eisentstein & Hu T(k) with online version
 
   !HMcode developed by Alexander Mead
   !==================================
@@ -592,6 +593,7 @@ CONTAINS
     cosm%sig8=0.8
     cosm%n=0.96
     cosm%wa=0.
+    cosm%T_cmb=2.725
 
     !Baryon feedback parameters
     cosm%Abary=3.13 !DMONLY
@@ -1081,12 +1083,12 @@ CONTAINS
 
     e=exp(1.)
 
-    thet=2.728/2.7
+    thet=cosm%T_cmb/2.7
     b1=0.313*(om_m*h*h)**(-0.419)*(1+0.607*(om_m*h*h)**0.674)
     b2=0.238*(om_m*h*h)**0.223
     zd=1291.*(1+b1*(om_b*h*h)**b2)*(om_m*h*h)**0.251/(1.+0.659*(om_m*h*h)**0.828)
     ze=2.50e4*om_m*h*h/thet**4.
-    rd=31500.*om_b*h*h/thet**4./zd !Should this be 1+zd (Steven Murray enquirey)?
+    rd=31500.*om_b*h*h/thet**4./(1.+zd) !Changed zd to 1+zd to align with Hu online code* (thanks Steven Murray!)
     re=31500.*om_b*h*h/thet**4./ze
     rke=7.46e-2*om_m*h*h/thet**2.
     s=(2./3./rke)*sqrt(6./re)*log((sqrt(1.+rd)+sqrt(rd+re))/(1+sqrt(re)))
@@ -1126,6 +1128,8 @@ CONTAINS
     tb=(tb+ab*fac/(1.+(bb/rk/s)**3.))*sin(rk*ss)/rk/ss
 
     tk_eh=real((om_b/om_m)*tb+(1-om_b/om_m)*tc)
+
+    !*http://background.uchicago.edu/~whu/transfer/tf_fit.c 
 
   END FUNCTION TK_EH
 
