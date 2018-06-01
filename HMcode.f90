@@ -30,9 +30,9 @@ PROGRAM HMcode
   REAL :: p1h, p2h, pfull, plin
   REAL, ALLOCATABLE :: k_tab(:), z_tab(:), pfull_tab(:,:)
   REAL, ALLOCATABLE :: plin_tab(:,:), p1h_tab(:,:), p2h_tab(:,:)
-  INTEGER :: i, j, nk, nz
+  INTEGER :: i, j
   LOGICAL :: verbose
-  REAL :: kmin, kmax, zmin, zmax, zin
+  REAL :: zin
   TYPE(cosmology) :: cosm
   TYPE(tables) :: lut
   CHARACTER(len=256) :: infile, outfile, redshift
@@ -42,12 +42,23 @@ PROGRAM HMcode
   !Constants
   REAL, PARAMETER :: pi=3.141592654
 
-  !Accuracy parameter for integrations
+  !Accuracy parameter for integrations and number of points in look-up tables
   REAL, PARAMETER :: acc=1e-4
+  INTEGER, PARAMETER :: n_lut=256 
+
+  !Set the k range
+  REAL, PARAMETER :: kmin=1e-3
+  REAL, PARAMETER :: kmax=1e2
+  INTEGER, PARAMETER :: nk=128
+
+  !Set the z range
+  REAL, PARAMETER :: zmin=0.
+  REAL, PARAMETER :: zmax=4.
+  INTEGER, PARAMETER :: nz=16
 
   !ihm parameter decides what to plot
   !1 - Do the accurate calculation detailed in Mead et al. (2015; 1505.07833) with updates from Mead et al. (2016; 1602.02154)
-  !2 - Standard halo-model calculation (Dv=200, dc=1.686) with linear two-halo term'
+  !2 - Basic halo-model calculation (Dv=200, dc=1.686) with linear two-halo term'
   !3 - Standard halo-model calculation (Dv=200, dc=1.686) with full two-halo term'
   INTEGER, PARAMETER :: ihm=1
   
@@ -104,9 +115,9 @@ PROGRAM HMcode
   WRITE(*,*)
 
   !Set number of k points and k range (log spaced)
-  nk=200
-  kmin=1e-3
-  kmax=1e4
+  !nk=200
+  !kmin=1e-3
+  !kmax=1e4
   CALL fill_table(log(kmin),log(kmax),k_tab,nk)
   k_tab=exp(k_tab)
 
@@ -116,9 +127,9 @@ PROGRAM HMcode
   WRITE(*,*)
 
   !Set the number of redshifts and range (linearly spaced)
-  nz=16
-  zmin=0.
-  zmax=4.
+  !nz=16
+  !zmin=0.
+  !zmax=4.
   CALL fill_table(zmin,zmax,z_tab,nz)
 
   WRITE(*,*) 'HMcode: z min:', zmin
@@ -781,8 +792,7 @@ CONTAINS
     TYPE(tables) :: lut
     REAL, PARAMETER :: mmin=1e2 !Minimum mass for integration
     REAL, PARAMETER :: mmax=1e18 !Maximum mass for integration
-    INTEGER, PARAMETER :: n=256 !Number of points for integration
-    REAL, PARAMETER :: large_nu=10. !A large value of nu
+    REAL, PARAMETER :: large_nu=5. !A large value of nu
     
     !Find value of sigma_v
     lut%sigv=sqrt(dispint(0.,z,cosm)/3.)
@@ -799,14 +809,14 @@ CONTAINS
 
     IF(ALLOCATED(lut%rr)) CALL deallocate_LUT(lut)
 
-    lut%n=n
+    lut%n=n_lut
     CALL allocate_lut(lut)
 
     dc=delta_c(z,cosm)
 
-    DO i=1,n 
+    DO i=1,lut%n
 
-       m=exp(log(mmin)+log(mmax/mmin)*float(i-1)/float(n-1))
+       m=exp(log(mmin)+log(mmax/mmin)*float(i-1)/float(lut%n-1))
        r=radius_m(m,cosm)
        sig=sigma_cb(r,z,cosm)
        nu=dc/sig
@@ -1156,7 +1166,7 @@ CONTAINS
     REAL, INTENT(IN) :: wk(lut%n)
     REAL :: sigv, frac!, rhom
     REAL, ALLOCATABLE :: integrand(:)
-    REAL :: nu, m, m0, w
+    REAL :: nu, m0, w
     REAL :: sum, crap
     INTEGER :: i
 
@@ -1173,7 +1183,7 @@ CONTAINS
 
        DO i=1,lut%n
 
-          m=lut%m(i)
+          !m=lut%m(i)
           nu=lut%nu(i)
           w=wk(i)
 

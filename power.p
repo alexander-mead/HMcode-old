@@ -7,14 +7,18 @@ reset
 #The plot should then be the non-linear spectrum at 16 redshifts
 
 #x-axis stuff
+kmin=1e-3
+kmax=1e2
 set log x
-set xrange [0.001:100.]
+set xrange [kmin:kmax]
 set xlabel 'k/(h Mpc^{-1})'
 set mxtics 10
 
 #y-axis stuff
+pmin=1e-8
+pmax=1e4
 set log y
-set yrange [1e-8:1e4]
+set yrange [pmin:pmax]
 set ylabel '{/Symbol D}^2(k)'
 set format y '10^{%T}'
 set mytics 1
