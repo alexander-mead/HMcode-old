@@ -52,3 +52,5 @@ Added support for an input linear spectrum from ```CAMB```. This can be input vi
 
 UPDATE: 2018/02/14
 Added support for a standard two-halo term. This can be activated by setting ```ihm=3``` in the code. Now ```ihm=1``` is the accurate calculation whereas ```ihm=2``` is the standard calculation but with a linear theory two-halo term. The variable ```imead``` has been removed. There is a new logical ```verbose```. Also added option ```ihm=0``` to do linear theory only.
+
+The continued upkeep of this code is made possible due to funding support from the European Union‘s Horizon 2020 research and innovation programme under the Marie Sklodowska-Curie grant agreement No. 702971.
